@@ -6,7 +6,7 @@ import slather.sim.Move;
 import slather.sim.Pherome;
 import java.util.*;
 
-
+//HELLO!
 public class Player implements slather.sim.Player {
     
     private Random gen;
