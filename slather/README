@@ -1,0 +1,39 @@
+Author:  Kevin Shi, Orestis Polychroniou
+Email:   kshi@cs.columbia.edu, orestis@cs.columbia.edu
+
+
+Player
+
+The players must extend the "slather/sim/Player.java" interface. An example dummy player is provided in "slather/g0/Player.java". The player code must be on a separate directory/package and the basic class must be in "Player.java". For example, group 4 should have the main class in "slather/g4/Player.java" under the pacakge pentos.g4
+
+The interface for a player specifies two methods, an "init()" method to initialize the player object with the simulator parameters d,t and a "play()" method to return the next movement of the player. The simulator first calls the default constructor with no arguments and then calls the "init()" method. As the game is played, the "play()" method is called on every turn until the game ends.
+
+The "play()" method is supplied with the cell that instructions must be given to, a byte specifying the memory available to that cell, and two sets specifying cells and pheromes that are within vision range d of the active cell. The play function must return a move object which specifies a vector for the cell to travel and a byte specifying the new memory to be written to the cell. 
+
+Simulator
+
+To run or compile the simulator, cd into the folder above pentos.
+To (re)compile the simulator on Unix & Mac OS X:   javac pentos/sim/*.java
+To (re)compile the simulator on Windows:           javac pentos\sim\*.java
+To run the simulator:  java pentos.sim.Simulator <arguments>
+
+The simulator is written and tested using Java version 8 (jre/jdk 1.8).
+To check the Java virtual machine version:     java -version
+To check the Java bytecode compiler version:   javac -version
+Earlier versions of Java may (will probably) not work. The simulator is
+operating system (OS) independent and has been (successfully) tested on:
+
+  Apple Mac OS X Yosemite (10.10)
+  GNU/Linux Ubuntu 16.04
+  Microsoft Windows 10 (running through Cygwin)
+
+The simulator arguments are:
+ -g <group name(s) separated by spaces, e.g. g1 g2 g3>
+ -t <integer number of turns pherome lasts, default 10>
+ -d <double vision radius of cell, default 2>
+ -s <side length of board, default 100>
+ --fps <integer specifying fps for gui display>
+ --gui
+ --verbose
+
+If the GUI option is enabled, the simulator creates a visualization of the game as a dynamic HTML page. To view the GUI, open the browser on localhost using the port displayed in a terminal message. For example, if the simulator shows port 54321 in the terminal, open the browser and use the address "http://localhost:54321" (or "http://127.0.0.1:54321"). Javascript must be enabled. The GUI uses HTML 5 canvas and the state updates use AJAX. Page reloads are supported (used when FPS is set to 0).
