@@ -175,7 +175,9 @@ class Simulator {
 			cells.get(i).move(move.vector, nearby_pheromes, nearby_cells, log);
 			cells.get(i).memory = move.memory;
 			cells.get(i).step(nearby_pheromes, nearby_cells);
-			grid.add(cells.get(i).secrete(t));
+			Pherome new_pherome = cells.get(i).secrete(nearby_pheromes, t);
+			if (new_pherome != null)
+			    grid.add(new_pherome);
 			if (readd)
 			    grid.readd(cells.get(i));			
 		    }
@@ -214,7 +216,7 @@ class Simulator {
 	    if (gui) {
 		// create dynamic content
 		//String content =  params() + "\n" + groups_state() + "\n" + cells_state() + "\n" + pheromes_state();
-		String content =  params() + "\n" + groups_state() + "\n" + grid.objects_state();
+		String content =  params(turn) + "\n" + groups_state() + "\n" + grid.objects_state();
 		gui(server, content);
 	    }
 	    turn++;
@@ -355,8 +357,8 @@ class Simulator {
 	System.exit(0);
     }
 
-    private static String params() {
-	return Integer.toString(side_length) + "," + Integer.toString(refresh);
+    private static String params(long turn) {
+	return Integer.toString(side_length) + "," + Integer.toString(refresh) + "," + Long.toString(turn) + "," + Integer.toString(turns_without_reproduction);
     }
 
     private static String groups_state() {	

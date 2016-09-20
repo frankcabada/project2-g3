@@ -18,7 +18,7 @@ function process(data)
     // check the canvas size
     var canvas = document.getElementById("canvas");
     var colors = ["red", "green", "blue", "purple", "orange", "cyan", "yellow", "hotpink", "palegreen", "maroon"];
-    var y_base = 60;
+    var y_base = 90;
     var size = canvas.height - y_base;
     var xoffset = 30;    
     var x_base = (canvas.width - size) * 0.5;
@@ -50,19 +50,29 @@ function process(data)
     ctx.strokeStyle = "black";
     ctx.stroke();
 
-    // parse the scores
+   
+
     ctx.font = "18px Arial";
     ctx.textAlign = "left";
     ctx.lineWidth = 4;
     ctx.strokeStyle = "darkgrey";
+    // parse game status
+    ctx.strokeText("Total turns played: " + params[2], 0, y_base - 60);;
+    ctx.fillStyle = "black";
+    ctx.fillText("Total turns played: " + params[2], 0, y_base - 60);;
+    ctx.strokeText("Turns without reproduction: " + params[3], 0, y_base - 30);;
+    ctx.fillStyle = "black";
+    ctx.fillText("Turns without reproduction: " + params[3], 0, y_base - 30);;
+    
+    // parse the scores    
     scores = data[1].split(";");
     for (var i=0; i<scores.length; i++) {
 	coord = scores[i].split(",");
 	g = coord[0];
 	score = parse_float(coord[1]);
-	ctx.strokeText(g + " :  " + score, 0, y_base + 30*i + 30);
+	ctx.strokeText(g + " :  " + score, 0, y_base + 30*i + 60);
 	ctx.fillStyle = colors[i];
-	ctx.fillText(g + " :  " + score, 0, y_base + 30*i + 30);
+	ctx.fillText(g + " :  " + score, 0, y_base + 30*i + 60);
     }
     
     // parse the cells
