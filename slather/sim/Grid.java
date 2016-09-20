@@ -6,8 +6,10 @@ public class Grid {
 
     ArrayList< ArrayList< HashSet<GridObject>>> grid; // for computing distances
     ArrayList<Cell> cells = new ArrayList<Cell>(); // for shuffling order of movement
+    //Set<Pherome> pheromes = new HashSet<Pherome>(); // for aging pheromes
     int N;
     double d;
+    double b;
     double side;
 
     class GridObjectsContainer {
@@ -21,7 +23,8 @@ public class Grid {
     
     public Grid(double side, double d) {
 	this.d = d;
-	N = (int) Math.round(Math.ceil(side / d));
+	b = d+2;
+	N = (int) Math.round(Math.ceil(side / b));
 	grid = new ArrayList< ArrayList< HashSet<GridObject> > >(N);
 	this.side = side;
 	for (int i=0; i<N; i++) {
@@ -60,6 +63,14 @@ public class Grid {
     }
 
     public void age_pheromes() {
+	/*Iterator<Pherome> it = pheromes.iterator();
+	while (it.hasNext()) {
+	    Pherome next = it.next();
+	    if (next.step()) {
+		it.remove();
+		grid.get(getI(next)).get(getJ(next)).remove(next);
+	    }
+	    }*/
 	for (int i = 0; i<N; i++) {
 	    for (int j = 0; j<N; j++) {
 		Iterator<GridObject> it = grid.get(i).get(j).iterator();
@@ -77,8 +88,9 @@ public class Grid {
 
     public GridObjectsContainer get_nearby(Cell q) {
 	GridObjectsContainer output = new GridObjectsContainer();
-	for (int i = (getI(q)-2+N) %N; i != (getI(q)+2+N) %N; i=(i+1)%N) {
-	    for (int j = (getJ(q)-2+N) %N; j != (getJ(q)+2+N) %N; j=(j+1)%N) {
+	int delta = 1;
+	for (int i = (getI(q)-delta+N) %N; i != (getI(q)+delta+1+N) %N; i=(i+1)%N) {
+	    for (int j = (getJ(q)-delta+N) %N; j != (getJ(q)+delta+1+N) %N; j=(j+1)%N) {
 		Iterator<GridObject> it = grid.get(i).get(j).iterator();
 		while (it.hasNext()) {
 		    GridObject next = it.next();
@@ -130,14 +142,14 @@ public class Grid {
     }
 
     private int getI(Point p) {
-	return (int)Math.round(Math.floor(p.x / d));
+	return (int)Math.round(Math.floor(p.x / b));
     }
 
     private int getJ(GridObject q) {
 	return getJ(q.getPosition());
     }    
     private int getJ(Point p) {
-	return (int)Math.round(Math.floor(p.y / d));
+	return (int)Math.round(Math.floor(p.y / b));
     }
     
 }

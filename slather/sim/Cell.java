@@ -82,8 +82,20 @@ public class Cell extends GridObject{
     protected void halve() {
 	diameter = diameter / 2;
     }
-    protected Pherome secrete(int max_duration) {
-	return new Pherome(position, player, max_duration);
+    protected Pherome secrete(Set<Pherome> nearby_pheromes, int max_duration) {
+	Iterator<Pherome> it = nearby_pheromes.iterator();
+	boolean has_overlapping_pherome = false;
+	while (it.hasNext()) {
+	    Pherome next = it.next();
+	    if (distance(next) <= 0) {
+		next.refresh();
+		has_overlapping_pherome = true;
+	    }
+	}
+	if (has_overlapping_pherome)
+	    return null;
+	else
+	    return new Pherome(position, player, max_duration);
     }
 
 }

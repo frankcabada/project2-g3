@@ -18,4 +18,8 @@ public class Pherome extends GridObject{
 	return (++duration > max_duration);
     }
 
+    protected void refresh() {
+	duration = 0;
+    }
+
 }
