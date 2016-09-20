@@ -30,56 +30,36 @@ public class Player implements slather.sim.Player {
 		
 		
 		if (player_cell.getDiameter() >= 2){ // reproduce whenever possible
-			//60% straightline, 20% cw circles, %20 ccw circles
+
 			Random rand = new Random();
-			int l2bits2;
-			switch(rand.nextInt(5)){
-			case 1: l2bits2=1; break;
-			case 2: l2bits2=2; break;
-			default: l2bits2=0; break;
-			}
-			
 			
 			byte memory1 = (byte) ((f6bits << 2) | (0x03 & l2bits)); //First daughter keeps same strategy
-			byte memory2 = (byte) ((rand.nextInt(60) << 2) | (0x03 & l2bits2)); //Second tries random strategy different from original
+			byte memory2 = (byte) ((f6bits << 2) | (0x03 & (l2bits+rand.nextInt(3))%4)); //Second tries random strategy different from original
 			
 			return new Move(true, memory1, memory2);
 		}
 		
-		for(int i=0; i<2; i++){
-			if(l2bits==0){ //This is the straight-line strategy
-				Point vector = extractVectorFromAngle(f6bits*4);
-				//Store bits back into memory
-				memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
-				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes))
-					return new Move(vector, memory);
-				else
-					f6bits = (f6bits + 15)%60; //90 degree split
-					
-			}
-			else if(l2bits==1){ //This is the clockwise circle strategy
-				f6bits = (f6bits+1)%60; //Keep degree precision at 4 (4*60 = 360 degrees)
-				Point vector = extractVectorFromAngle(f6bits * 6);
-				//Store bits back into memory
-				memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
-				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes))
-					return new Move(vector, memory);
-				else{
-					l2bits=2; //switch to ccw circles
-					f6bits = (f6bits + 15)%60;
-				}
-			}
-			else if(l2bits==2){ //This is the counterclockwise circle strategy
-				f6bits = (f6bits-1+60)%60; //Keep degree precision at 4 (4*60 = 360 degrees)
-				Point vector = extractVectorFromAngle(f6bits * 6);
-				//Store bits back into memory
-				memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
-				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes))
-					return new Move(vector, memory);
-				else{
-					l2bits=1; //switch to cw circles
-					f6bits = (f6bits + 15)%60;
-				}
+		
+		
+		for(int i=0; i<4; i++){
+			//This is the counterclockwise circle strategy
+			f6bits = (f6bits+1)%60; //Keep degree precision at 6 (6*60 = 360 degrees)
+
+			//				Point vector = extractVectorFromAngle(f6bits * 6);
+			
+			Point vector;
+			if(f6bits <30)
+				vector = extractVectorFromAngle(f6bits * 6 +l2bits*90);
+			else
+				vector = extractVectorFromAngle((60-f6bits) * 6 +l2bits*90);
+			
+			//Store bits back into memory
+			memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
+			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes))
+				return new Move(vector, memory);
+			else{
+				l2bits = (l2bits+1)%4; //switch to cw circles
+//					f6bits = (f6bits + 30)%60;
 			}
 		}
 
@@ -124,7 +104,7 @@ public class Player implements slather.sim.Player {
 	// Cell.move_dist (max allowed movement distance)
 	private Point extractVectorFromAngle(int arg) {
 		
-		double theta = Math.toRadians(2 * (double) arg); //We need bigger circles!
+		double theta = Math.toRadians(1 * (double) arg); //We need bigger circles!
 		double dx = Cell.move_dist * Math.cos(theta);
 		double dy = Cell.move_dist * Math.sin(theta);
 		return new Point(dx, dy);
