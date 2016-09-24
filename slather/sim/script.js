@@ -1,3 +1,7 @@
+function pause() {
+    paused = (paused + 1) % 2;
+}
+
 function parse_float(x)
 {
     if (isNaN(parseFloat(x)) || !isFinite(x))
@@ -41,11 +45,6 @@ function process(data)
     ctx.lineTo(x_base + size + xoffset, y_base + size);
     ctx.lineTo(x_base + xoffset,        y_base + size);
     ctx.lineTo(x_base + xoffset,        y_base);
-/*    ctx.moveTo(x_base + 1.5,        y_base + 1.5);
-    ctx.lineTo(x_base + size - 1.5, y_base + 1.5);
-    ctx.lineTo(x_base + size - 1.5, y_base + size - 1.5);
-    ctx.lineTo(x_base + 1.5,        y_base + size - 1.5);
-    ctx.lineTo(x_base + 1.5,        y_base + 1.5);*/
     ctx.lineWidth = 3;
     ctx.strokeStyle = "black";
     ctx.stroke();
@@ -120,7 +119,7 @@ function ajax(version, retries, timeout)
 	    if (xhr.status != 200)
 		throw "Invalid HTTP status: " + xhr.status;
 	    refresh = process(xhr.responseText);
-	    if (latest_version < version)
+	    if (latest_version < version && paused == 0)
 		latest_version = version;
 	    else
 		refresh = -1;
@@ -146,4 +145,5 @@ function ajax(version, retries, timeout)
     xhr.send();
 }
 
+var paused = 0;
 ajax(0, 10, 100);
