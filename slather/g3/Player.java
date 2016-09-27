@@ -13,7 +13,7 @@ public class Player implements slather.sim.Player {
     private int t;
     private int side_length;
     private final int CLOSE_RANGE = 5;
-    private final int NEIGHBOR_THRESHOLD = 2;
+    private final int NEIGHBOR_THRESHOLD = 10;
 
     public void init(double d, int t, int side_length) {
 		gen = new Random();
