@@ -12,12 +12,15 @@ public class Player implements slather.sim.Player {
     private double d;
     private int t;
     private int side_length;
+    private int crowding = 0;
+    private boolean endgame = false;
+    private final int NEIGHBOR_THRESHOLD = 10;
 
     public void init(double d, int t, int side_length) {
-	gen = new Random();
-	this.d = d;
-	this.t = t;
-	this.side_length = side_length;
+		gen = new Random();
+		this.d = d;
+		this.t = t;
+		this.side_length = side_length;
     }
 
 	public Move play(Cell player_cell, byte memory, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
@@ -30,51 +33,141 @@ public class Player implements slather.sim.Player {
 		//Get the last 2 bits out of memory
 		int l2bits = memory & 0x03;
 
-		
+		if (nearby_cells.size() > NEIGHBOR_THRESHOLD) {
+			++crowding;
+			if (crowding >= 3) {
+				// move to endgame strategy
+				endgame = true;
+			}
+		}
 //		System.out.println("Memory is: " + memory);
-//		System.out.println("First 6 bits: " + f6bits + "\t Last 2 bits: " + l2bits);		
-		
+//		System.out.println("First 6 bits: " + f6bits + "\t Last 2 bits: " + l2bits);				
 		
 		if (player_cell.getDiameter() >= 2){ // reproduce whenever possible
 
 			Random rand = new Random();
 			
 			byte memory1 = (byte) ((f6bits << 2) | (0x03 & l2bits)); //First daughter keeps same strategy
-			byte memory2 = (byte) ((f6bits << 2) | (0x03 & (l2bits+rand.nextInt(3))%4)); //Second tries random strategy different from original
+			byte memory2 = (byte) ((f6bits << 2) | (0x03 & (l2bits)));
 			
 			return new Move(true, memory1, memory2);
 		}
-		
-		
-		
-		for(int i=0; i<4; i++){
-			//This is the counterclockwise circle strategy
-			f6bits = (f6bits+1)%60; //Keep degree precision at 6 (6*60 = 360 degrees)
 
-			//				Point vector = extractVectorFromAngle(f6bits * 6);
-			
-			Point vector;
-			if(f6bits <30)
-				vector = extractVectorFromAngle(f6bits * 6 +l2bits*90);
-			else
-				vector = extractVectorFromAngle((60-f6bits) * 6 +l2bits*90);
-			
-			//Store bits back into memory
-			memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
-			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes))
-				return new Move(vector, memory);
-			else{
-				l2bits = (l2bits+1)%4; //switch to cw circles
-//					f6bits = (f6bits + 30)%60;
+		if(endgame == true) {
+			for (int i=0; i<4; i++) {
+				int angle = l2bits * 90;
+				Point vector = extractVectorFromAngle(angle);
+				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+					memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
+					return new Move(vector, memory);
+				}
+				else {
+					if (l2bits <= 3) { l2bits++; }
+					else { l2bits = 0; }
+				}
 			}
+			// if cannot move in any cardinal direction just stay in place
+			return new Move(new Point(0, 0), (byte) 0);
 		}
-
+		
+		if(l2bits==0){
+			ArrayList<Integer> angleList = new ArrayList<Integer>();
+			for(Cell c : nearby_cells){
+				double cX = c.getPosition().x;
+				double cY = c.getPosition().y;
+				double tX = player_cell.getPosition().x;
+				double tY = player_cell.getPosition().y;
+				double dX = cX-tX;
+				double dY = cY-tY;
+				double angle = Math.atan(dY/dX);
+				
+				if(dX>=0 && dY>=0); //Do nothing
+				if(dX>=0 && dY<0) angle += 2*Math.PI;
+				if(dX<0 && dY>=0) angle = Math.PI - angle;
+				if(dX<0 && dY<0) angle = Math.PI - angle;
+//				System.out.println(player_cell.hashCode() + "\t" + dY/dX);
+//				System.out.println(Math.toDegrees(angle));
+				angleList.add((int)Math.toDegrees(angle));
+			}
+			//Repeating the same crap for pheromes
+			for(Pherome p : nearby_pheromes){
+				if(p.player == player_cell.player) //Ignore your own pheromes
+					continue;
+				double pX = p.getPosition().x;
+				double pY = p.getPosition().y;
+				double tX = player_cell.getPosition().x;
+				double tY = player_cell.getPosition().y;
+				double dX = pX-tX;
+				double dY = pY-tY;
+				double angle = Math.atan(dY/dX);
+				
+				if(dX>=0 && dY>=0); //Do nothing
+				if(dX>=0 && dY<0) angle += 2*Math.PI;
+				if(dX<0 && dY>=0) angle = Math.PI - angle;
+				if(dX<0 && dY<0) angle = Math.PI - angle;
+				
+//				System.out.println(player_cell.hashCode() + "\t" + dY/dX);
+//				System.out.println(Math.toDegrees(angle));
+				angleList.add((int)Math.toDegrees(angle));
+			}
+			
+			
+			Collections.sort(angleList);
+//			System.out.println(angleList);
+			
+			if(angleList.isEmpty()){
+				int finalAngle = f6bits*6;
+				Point vector = extractVectorFromAngle(finalAngle);
+				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+					memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
+					return new Move(vector, memory);
+				}
+			}
+			if(angleList.size()==1){
+				int finalAngle = (angleList.get(0)+180)%360;
+				f6bits = finalAngle/6;
+				Point vector = extractVectorFromAngle(finalAngle);
+				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+					memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
+					return new Move(vector, memory);
+				}
+			}
+			else if(angleList.size()>=2){
+				int maxDiff = angleList.get(0)-angleList.get(angleList.size()-1)+360;
+				int index = angleList.size()-1;
+				for(int i=0; i<angleList.size()-1; i++){
+					//Don't consider if causes collision
+					if (collides(player_cell, extractVectorFromAngle((angleList.get(i+1)+angleList.get(i))/2), nearby_cells, nearby_pheromes)){
+						memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
+						continue;
+					}
+					
+					
+					if(	(angleList.get(i+1)-angleList.get(i)) > maxDiff	){
+						maxDiff = (angleList.get(i+1)-angleList.get(i));
+						index = i;
+					}
+				}
+				int finalAngle = angleList.get(index) + maxDiff/2;
+				f6bits = finalAngle/6;
+				Point vector = extractVectorFromAngle(finalAngle);
+				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+					memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
+					return new Move(vector, memory);
+				}
+			}
+			
+			//ToDo: 
+			//If you can't find anything, go towards your closest pherome
+			//MODULARIZE ENTIRE CODE	
+		}
+		
 		// If there was a collision, try
 		// random directions to go in until one doesn't collide
 		for (int i = 0; i < 4; i++) {
 //			int arg = gen.nextInt(180) + 1;
 			f6bits = gen.nextInt(60);
-			Point vector = extractVectorFromAngle(f6bits);
+			Point vector = extractVectorFromAngle(f6bits*6);
 			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
 				memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
 				return new Move(vector, memory);
