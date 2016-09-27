@@ -28,9 +28,9 @@ public class Player implements slather.sim.Player {
 //		System.out.println(bitset.toString());
 		
 		//Get the first 6 bits out of memory
-		int f6bits = ((memory >> 2) & 0x3f); 
+		int f6bits = readF6Bits(memory);
 		//Get the last 2 bits out of memory
-		int l2bits = memory & 0x03;
+		int l2bits = readL2Bits(memory);
 
 		Set<Cell> closest_cells = closeRangeCells(player_cell, nearby_cells);
 
@@ -46,8 +46,10 @@ public class Player implements slather.sim.Player {
 
 			Random rand = new Random();
 			
-			byte memory1 = (byte) ((f6bits << 2) | (0x03 & l2bits)); //First daughter keeps same strategy
-			byte memory2 = (byte) ((f6bits << 2) | (0x03 & (l2bits)));
+			//byte memory1 = (byte) ((f6bits << 2) | (0x03 & l2bits)); //First daughter keeps same strategy
+			//byte memory2 = (byte) ((f6bits << 2) | (0x03 & (l2bits)));
+			byte memory1 = writeMemoryByte(f6bits, l2bits);
+			byte memory2 = writeMemoryByte(f6bits, 0);
 			
 			return new Move(true, memory1, memory2);
 		}
@@ -67,47 +69,11 @@ public class Player implements slather.sim.Player {
 		}
 		// normal strategy
 		else {
+			ArrayList<Integer> cellAngleList = generateAngleListOfNearbyCells(player_cell,nearby_cells, false);
+			ArrayList<Integer> pheromeAngleList = generateAngleListOfNearbyPheromes(player_cell,nearby_pheromes, true);
 			ArrayList<Integer> angleList = new ArrayList<Integer>();
-			for(Cell c : nearby_cells){
-				double cX = c.getPosition().x;
-				double cY = c.getPosition().y;
-				double tX = player_cell.getPosition().x;
-				double tY = player_cell.getPosition().y;
-				double dX = cX-tX;
-				double dY = cY-tY;
-				double angle = Math.atan(dY/dX);
-				
-				if(dX>=0 && dY>=0); //Do nothing
-				if(dX>=0 && dY<0) angle += 2*Math.PI;
-				if(dX<0 && dY>=0) angle = Math.PI - angle;
-				if(dX<0 && dY<0) angle = Math.PI - angle;
-//				System.out.println(player_cell.hashCode() + "\t" + dY/dX);
-//				System.out.println(Math.toDegrees(angle));
-				angleList.add((int)Math.toDegrees(angle));
-			}
-			//Repeating the same crap for pheromes
-			for(Pherome p : nearby_pheromes){
-				if(p.player == player_cell.player) //Ignore your own pheromes
-					continue;
-				double pX = p.getPosition().x;
-				double pY = p.getPosition().y;
-				double tX = player_cell.getPosition().x;
-				double tY = player_cell.getPosition().y;
-				double dX = pX-tX;
-				double dY = pY-tY;
-				double angle = Math.atan(dY/dX);
-				
-				if(dX>=0 && dY>=0); //Do nothing
-				if(dX>=0 && dY<0) angle += 2*Math.PI;
-				if(dX<0 && dY>=0) angle = Math.PI - angle;
-				if(dX<0 && dY<0) angle = Math.PI - angle;
-				
-//				System.out.println(player_cell.hashCode() + "\t" + dY/dX);
-//				System.out.println(Math.toDegrees(angle));
-				angleList.add((int)Math.toDegrees(angle));
-			}
-			
-			
+			angleList.addAll(cellAngleList);
+			angleList.addAll(pheromeAngleList);
 			Collections.sort(angleList);
 //			System.out.println(angleList);
 			
@@ -115,7 +81,7 @@ public class Player implements slather.sim.Player {
 				int finalAngle = f6bits*6;
 				Point vector = extractVectorFromAngle(finalAngle);
 				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
-					memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
+					memory = writeMemoryByte(f6bits,l2bits);
 					return new Move(vector, memory);
 				}
 			}
@@ -124,7 +90,7 @@ public class Player implements slather.sim.Player {
 				f6bits = finalAngle/6;
 				Point vector = extractVectorFromAngle(finalAngle);
 				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
-					memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
+					memory = writeMemoryByte(f6bits,l2bits);
 					return new Move(vector, memory);
 				}
 			}
@@ -134,7 +100,7 @@ public class Player implements slather.sim.Player {
 				for(int i=0; i<angleList.size()-1; i++){
 					//Don't consider if causes collision
 					if (collides(player_cell, extractVectorFromAngle((angleList.get(i+1)+angleList.get(i))/2), nearby_cells, nearby_pheromes)){
-						memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
+						memory = writeMemoryByte(f6bits,l2bits);
 						continue;
 					}
 					
@@ -145,10 +111,11 @@ public class Player implements slather.sim.Player {
 					}
 				}
 				int finalAngle = angleList.get(index) + maxDiff/2;
+				finalAngle %= 360;
 				f6bits = finalAngle/6;
 				Point vector = extractVectorFromAngle(finalAngle);
 				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
-					memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
+					memory = writeMemoryByte(f6bits,l2bits);
 					return new Move(vector, memory);
 				}
 			}
@@ -165,7 +132,7 @@ public class Player implements slather.sim.Player {
 			f6bits = gen.nextInt(60);
 			Point vector = extractVectorFromAngle(f6bits*6);
 			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
-				memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
+				memory = writeMemoryByte(f6bits,l2bits);
 				return new Move(vector, memory);
 			}
 		}
@@ -214,4 +181,82 @@ public class Player implements slather.sim.Player {
 		}
 		return closest_cells;
     }
+    
+	private int readF6Bits(byte memory){
+		int f6bits = ((memory >> 2) & 0x3f); 
+		return f6bits;
+	}
+
+	private int readL2Bits(byte memory){
+		int l2bits = memory & 0x03;
+		return l2bits;
+	}
+	
+	private byte writeMemoryByte(int f6bits, int l2bits){
+		if(f6bits < 0){
+			throw new RuntimeException("f6bits is negative: [" + f6bits + "]");
+		}
+		if(f6bits >= 63){
+			throw new RuntimeException("f6bits is greater than 63: [" + f6bits + "]");
+		}
+		if(l2bits < 0){
+			throw new RuntimeException("l2bits is negative: [" + l2bits + "]");
+		}
+		if(l2bits > 3){
+			throw new RuntimeException("l2bits is greater than 3: [" + f6bits + "]");
+		}
+		byte memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
+		return memory;
+	}
+
+	private ArrayList<Integer> generateAngleListOfNearbyCells(Cell player_cell, Set<Cell> nearby_cells, boolean ignoreSamePlayer){
+		ArrayList<Integer> angleList = new ArrayList<Integer>();
+		for(Cell c : nearby_cells){
+			if(ignoreSamePlayer && (c.player == player_cell.player)) //Ignore your own pheromes
+				continue;
+			double cX = c.getPosition().x;
+			double cY = c.getPosition().y;
+			double tX = player_cell.getPosition().x;
+			double tY = player_cell.getPosition().y;
+			double dX = cX-tX;
+			double dY = cY-tY;
+			double angle = Math.atan(dY/dX);
+			
+			if(dX>=0 && dY>=0); //Do nothing
+			if(dX>=0 && dY<0) angle += 2*Math.PI;
+			if(dX<0 && dY>=0) angle = Math.PI - angle;
+			if(dX<0 && dY<0) angle = Math.PI - angle;
+//			System.out.println(player_cell.hashCode() + "\t" + dY/dX);
+//			System.out.println(Math.toDegrees(angle));
+			angleList.add((int)Math.toDegrees(angle));
+		}
+		Collections.sort(angleList);
+		return angleList;
+	}
+	
+	private ArrayList<Integer> generateAngleListOfNearbyPheromes(Cell player_cell, Set<Pherome> nearby_pheromes, boolean ignoreSamePlayer){
+		ArrayList<Integer> angleList = new ArrayList<Integer>();
+		for(Pherome p : nearby_pheromes){
+			if(ignoreSamePlayer && (p.player == player_cell.player)) //Ignore your own pheromes
+				continue;
+			double pX = p.getPosition().x;
+			double pY = p.getPosition().y;
+			double tX = player_cell.getPosition().x;
+			double tY = player_cell.getPosition().y;
+			double dX = pX-tX;
+			double dY = pY-tY;
+			double angle = Math.atan(dY/dX);
+			
+			if(dX>=0 && dY>=0); //Do nothing
+			if(dX>=0 && dY<0) angle += 2*Math.PI;
+			if(dX<0 && dY>=0) angle = Math.PI - angle;
+			if(dX<0 && dY<0) angle = Math.PI - angle;
+			
+//			System.out.println(player_cell.hashCode() + "\t" + dY/dX);
+//			System.out.println(Math.toDegrees(angle));
+			angleList.add((int)Math.toDegrees(angle));
+		}
+		Collections.sort(angleList);
+		return angleList;
+	}
 }
