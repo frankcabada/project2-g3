@@ -12,9 +12,8 @@ public class Player implements slather.sim.Player {
     private double d;
     private int t;
     private int side_length;
-    private int crowding = 0;
-    private boolean endgame = false;
-    private final int NEIGHBOR_THRESHOLD = 10;
+    private final int CLOSE_RANGE = 5;
+    private final int NEIGHBOR_THRESHOLD = 2;
 
     public void init(double d, int t, int side_length) {
 		gen = new Random();
@@ -33,11 +32,11 @@ public class Player implements slather.sim.Player {
 		//Get the last 2 bits out of memory
 		int l2bits = memory & 0x03;
 
-		if (nearby_cells.size() > NEIGHBOR_THRESHOLD) {
-			++crowding;
-			if (crowding >= 3) {
-				// move to endgame strategy
-				endgame = true;
+		Set<Cell> closest_cells = closeRangeCells(player_cell, nearby_cells);
+
+		if (closest_cells.size() > NEIGHBOR_THRESHOLD) {
+			if (l2bits < 3) {
+				++l2bits;
 			}
 		}
 //		System.out.println("Memory is: " + memory);
@@ -53,24 +52,21 @@ public class Player implements slather.sim.Player {
 			return new Move(true, memory1, memory2);
 		}
 
-		if(endgame == true) {
+		// endgame strategy
+		if(l2bits==3) {
 			for (int i=0; i<4; i++) {
-				int angle = l2bits * 90;
+				int angle = i * 90;
 				Point vector = extractVectorFromAngle(angle);
 				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
 					memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
 					return new Move(vector, memory);
 				}
-				else {
-					if (l2bits <= 3) { l2bits++; }
-					else { l2bits = 0; }
-				}
 			}
 			// if cannot move in any cardinal direction just stay in place
 			return new Move(new Point(0, 0), (byte) 0);
 		}
-		
-		if(l2bits==0){
+		// normal strategy
+		else {
 			ArrayList<Integer> angleList = new ArrayList<Integer>();
 			for(Cell c : nearby_cells){
 				double cX = c.getPosition().x;
@@ -209,6 +205,13 @@ public class Player implements slather.sim.Player {
 		return new Point(dx, dy);
 	}
 	
-
-
+    private Set<Cell> closeRangeCells(Cell source_cell, Set<Cell> all_cells) {
+    	Set<Cell> closest_cells = new HashSet<Cell>();
+		for (Cell other_cell : all_cells) {
+			if (source_cell.distance(other_cell) < CLOSE_RANGE) {
+				closest_cells.add(other_cell);
+			}
+		}
+		return closest_cells;
+    }
 }
