@@ -45,7 +45,7 @@ public class Player implements slather.sim.Player {
 			//byte memory2 = writeMemoryByte(f6bits, 0);
 			
 			byte memory1 = memory;
-			byte memory2 = memory;
+			byte memory2 = (byte) ((memory + 90) % 180);
 			return new Move(true, memory1, memory2);
 		}
 
@@ -61,7 +61,6 @@ public class Player implements slather.sim.Player {
 			int finalAngle = memory*2;
 			Point vector = extractVectorFromAngle(finalAngle);
 			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
-				//memory = writeMemoryByte(f6bits,l2bits); 
 				return new Move(vector, memory);
 			}
 		}
@@ -70,7 +69,6 @@ public class Player implements slather.sim.Player {
 			memory = (byte) (finalAngle/2);
 			Point vector = extractVectorFromAngle(finalAngle);
 			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
-				//memory = writeMemoryByte(f6bits,l2bits);
 				return new Move(vector, memory);
 			}
 		}
@@ -79,24 +77,22 @@ public class Player implements slather.sim.Player {
 			int index = angleList.size()-1;
 			for(int i=0; i<angleList.size()-1; i++){
 				//Don't consider if causes collision
-	// THIS LINE NEEDS TO BE FIXED
-				if (collides(player_cell, extractVectorFromAngle((angleList.get(i+1)+angleList.get(i))/2), nearby_cells, nearby_pheromes)){
-					//memory = writeMemoryByte(f6bits,l2bits);
+				int bisectAngle = ((angleList.get(i+1) + angleList.get(i)) % 360) / 2; 
+				if (collides(player_cell, extractVectorFromAngle(bisectAngle), nearby_cells, nearby_pheromes)){
 					continue;
 				}
 				
-				if(	(angleList.get(i+1)-angleList.get(i)) > maxDiff	){
-					maxDiff = (angleList.get(i+1)-angleList.get(i));
+				int thisDiff = angleList.get(i+1) - angleList.get(i);
+				if(	thisDiff > maxDiff	){
+					maxDiff = thisDiff;
 					index = i;
 				}
 			}
-	// VERIFY THAT THIS NEXT LINE PROPERLY WORKS
 			int finalAngle = angleList.get(index) + maxDiff/2;
 			finalAngle %= 360;
 			memory = (byte) (finalAngle/2);
 			Point vector = extractVectorFromAngle(finalAngle);
 			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
-				//memory = writeMemoryByte(f6bits,l2bits);
 				return new Move(vector, memory);
 			}
 		}	
@@ -104,11 +100,9 @@ public class Player implements slather.sim.Player {
 		// If there was a collision, try
 		// random directions to go in until one doesn't collide
 		for (int i = 0; i < 10; i++) {
-//			int arg = gen.nextInt(180) + 1;
 			memory = (byte) gen.nextInt(180);
 			Point vector = extractVectorFromAngle(memory*2);
 			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
-				//memory = writeMemoryByte(f6bits,l2bits);
 				return new Move(vector, memory);
 			}
 		}
