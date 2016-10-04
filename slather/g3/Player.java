@@ -1,4 +1,4 @@
-package slather.g3;
+package slather.h3;
 
 import slather.sim.Cell;
 import slather.sim.Point;
@@ -12,11 +12,12 @@ public class Player implements slather.sim.Player {
     private double d;
     private int t;
     private int side_length;
-    private final int CLOSE_RANGE_VISION = 5;
+    private final int CLOSE_RANGE = 5;
+    private final int NEIGHBOR_THRESHOLD = 10;
 
     public void init(double d, int t, int side_length) {
 		gen = new Random();
-		this.d = (d>5) ? 5 : d;
+		this.d = d;
 		this.t = t;
 		this.side_length = side_length;
     }
@@ -31,6 +32,13 @@ public class Player implements slather.sim.Player {
 		//Get the last 2 bits out of memory
 		int l2bits = readL2Bits(memory);
 
+		Set<Cell> closest_cells = closeRangeCells(player_cell, nearby_cells);
+
+		if (closest_cells.size() > NEIGHBOR_THRESHOLD) {
+			if (l2bits < 3) {
+				++l2bits;
+			}
+		}
 //		System.out.println("Memory is: " + memory);
 //		System.out.println("First 6 bits: " + f6bits + "\t Last 2 bits: " + l2bits);				
 		
@@ -38,14 +46,29 @@ public class Player implements slather.sim.Player {
 
 			Random rand = new Random();
 			
-			byte memory1 = writeMemoryByte(f6bits, 0);
+			//byte memory1 = (byte) ((f6bits << 2) | (0x03 & l2bits)); //First daughter keeps same strategy
+			//byte memory2 = (byte) ((f6bits << 2) | (0x03 & (l2bits)));
+			byte memory1 = writeMemoryByte(f6bits, l2bits);
 			byte memory2 = writeMemoryByte(f6bits, 0);
 			
 			return new Move(true, memory1, memory2);
 		}
 
-		// This is our first strategy. No second one yet.
-		if(l2bits==0) {
+		// endgame strategy
+		if(l2bits==3) {
+			for (int i=0; i<4; i++) {
+				int angle = i * 90;
+				Point vector = extractVectorFromAngle(angle);
+				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+					memory = (byte) ((f6bits << 2) | (0x03 & l2bits));
+					return new Move(vector, memory);
+				}
+			}
+			// if cannot move in any cardinal direction just stay in place
+			return new Move(new Point(0, 0), (byte) 0);
+		}
+		// normal strategy
+		else {
 			ArrayList<Integer> cellAngleList = generateAngleListOfNearbyCells(player_cell,nearby_cells, false);
 			ArrayList<Integer> pheromeAngleList = generateAngleListOfNearbyPheromes(player_cell,nearby_pheromes, true);
 			ArrayList<Integer> angleList = new ArrayList<Integer>();
@@ -54,63 +77,52 @@ public class Player implements slather.sim.Player {
 			Collections.sort(angleList);
 //			System.out.println(angleList);
 			
-			//Keep trying for max cell distance moves, otherwise move 10% less and keep trying
-			for(int f=10; f>0; f--){
-				if(angleList.isEmpty()){
-					int finalAngle = f6bits*6;
-					Point vector = extractVectorFromAngleAndDistance(finalAngle,0.1f*f);
-					if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+			if(angleList.isEmpty()){
+				int finalAngle = f6bits*6;
+				Point vector = extractVectorFromAngle(finalAngle);
+				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+					memory = writeMemoryByte(f6bits,l2bits);
+					return new Move(vector, memory);
+				}
+			}
+			if(angleList.size()==1){
+				int finalAngle = (angleList.get(0)+180)%360;
+				f6bits = finalAngle/6;
+				Point vector = extractVectorFromAngle(finalAngle);
+				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+					memory = writeMemoryByte(f6bits,l2bits);
+					return new Move(vector, memory);
+				}
+			}
+			else if(angleList.size()>=2){
+				int maxDiff = angleList.get(0)-angleList.get(angleList.size()-1)+360;
+				int index = angleList.size()-1;
+				for(int i=0; i<angleList.size()-1; i++){
+					//Don't consider if causes collision
+					if (collides(player_cell, extractVectorFromAngle((angleList.get(i+1)+angleList.get(i))/2), nearby_cells, nearby_pheromes)){
 						memory = writeMemoryByte(f6bits,l2bits);
-						return new Move(vector, memory);
+						continue;
+					}
+					
+					
+					if(	(angleList.get(i+1)-angleList.get(i)) > maxDiff	){
+						maxDiff = (angleList.get(i+1)-angleList.get(i));
+						index = i;
 					}
 				}
-				else if(angleList.size()==1){
-					int finalAngle = (angleList.get(0)+180)%360;
-					f6bits = finalAngle/6;
-					Point vector = extractVectorFromAngleAndDistance(finalAngle,0.1f*f);
-					if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
-						memory = writeMemoryByte(f6bits,l2bits);
-						return new Move(vector, memory);
-					}
+				int finalAngle = angleList.get(index) + maxDiff/2;
+				finalAngle %= 360;
+				f6bits = finalAngle/6;
+				Point vector = extractVectorFromAngle(finalAngle);
+				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+					memory = writeMemoryByte(f6bits,l2bits);
+					return new Move(vector, memory);
 				}
-				else if(angleList.size()>=2){
-					HashMap<Integer, Integer> angDiffToAngle = new HashMap<Integer,Integer>();
-					
-//					int maxDiff = angleList.get(0)-angleList.get(angleList.size()-1)+360;
-//					int index = angleList.size()-1;
-					for(int i=0; i<angleList.size()-1; i++){
-						//Don't consider if causes collision
-						if (collides(player_cell, extractVectorFromAngle((angleList.get(i+1)+angleList.get(i))/2), nearby_cells, nearby_pheromes)){
-							memory = writeMemoryByte(f6bits,l2bits);
-							continue;
-						}
-//						if(	(angleList.get(i+1)-angleList.get(i)) > maxDiff	){
-//							maxDiff = (angleList.get(i+1)-angleList.get(i));
-//							index = i;
-//						}
-						angDiffToAngle.put((angleList.get(i+1)-angleList.get(i))/2, (angleList.get(i)+angleList.get(i+1))/2);
-					}
-					int tempDiff = angleList.get(0)-angleList.get(angleList.size()-1)+360;
-					
-					angDiffToAngle.put(tempDiff, angleList.get(angleList.size()-1) + tempDiff/2);
-					
-					ArrayList<Integer> angleDifferenceList = new ArrayList<Integer>(angDiffToAngle.keySet());
-					Collections.sort(angleDifferenceList);
-					Collections.reverse(angleDifferenceList);
-					for(int i=0; i<angleDifferenceList.size(); i++){
-						int finalAngle = angDiffToAngle.get(angleDifferenceList.get(i));
-						finalAngle %= 360;
-						f6bits = finalAngle/6;
-						Point vector = extractVectorFromAngleAndDistance(finalAngle,0.1f*f);
-						if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
-							memory = writeMemoryByte(f6bits,l2bits);
-							return new Move(vector, memory);
-						}
-					}
-				}
-				
 			}
 			
+			//ToDo: 
+			//If you can't find anything, go towards your closest pherome
+			//MODULARIZE ENTIRE CODE	
 		}
 		
 		// If there was a collision, try
@@ -152,17 +164,6 @@ public class Player implements slather.sim.Player {
 
 	// convert an angle (in 2-deg increments) to a vector with magnitude
 	// Cell.move_dist (max allowed movement distance)
-	
-	private Point extractVectorFromAngleAndDistance(int arg, float mult) {
-		if(mult <= 0) throw new RuntimeException("mult is nonpositive; mult[" + mult + "]");
-		if(mult > 1) throw new RuntimeException("mult is greater than 1; mult[" + mult + "]");
-		
-		double theta = Math.toRadians(1 * (double) arg); //We need bigger circles!
-		double dx = mult*Cell.move_dist * Math.cos(theta);
-		double dy = mult*Cell.move_dist * Math.sin(theta);
-		return new Point(dx, dy);
-	}
-	
 	private Point extractVectorFromAngle(int arg) {
 		
 		double theta = Math.toRadians(1 * (double) arg); //We need bigger circles!
@@ -174,7 +175,7 @@ public class Player implements slather.sim.Player {
     private Set<Cell> closeRangeCells(Cell source_cell, Set<Cell> all_cells) {
     	Set<Cell> closest_cells = new HashSet<Cell>();
 		for (Cell other_cell : all_cells) {
-			if (source_cell.distance(other_cell) < CLOSE_RANGE_VISION) {
+			if (source_cell.distance(other_cell) < CLOSE_RANGE) {
 				closest_cells.add(other_cell);
 			}
 		}
@@ -213,10 +214,6 @@ public class Player implements slather.sim.Player {
 		for(Cell c : nearby_cells){
 			if(ignoreSamePlayer && (c.player == player_cell.player)) //Ignore your own pheromes
 				continue;
-			
-			if(player_cell.distance(c) > CLOSE_RANGE_VISION)
-				continue;
-			
 			double cX = c.getPosition().x;
 			double cY = c.getPosition().y;
 			double tX = player_cell.getPosition().x;
@@ -242,10 +239,6 @@ public class Player implements slather.sim.Player {
 		for(Pherome p : nearby_pheromes){
 			if(ignoreSamePlayer && (p.player == player_cell.player)) //Ignore your own pheromes
 				continue;
-			
-			if(player_cell.distance(p) > CLOSE_RANGE_VISION)
-				continue;
-			
 			double pX = p.getPosition().x;
 			double pY = p.getPosition().y;
 			double tX = player_cell.getPosition().x;
