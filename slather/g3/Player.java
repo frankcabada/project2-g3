@@ -16,7 +16,7 @@ public class Player implements slather.sim.Player {
 
     public void init(double d, int t, int side_length) {
 		gen = new Random();
-		this.d = (d>5) ? 5 : d;
+		this.d = d;
 		this.t = t;
 		this.side_length = side_length;
     }
