@@ -35,8 +35,6 @@ public class Player implements slather.sim.Player {
 //		System.out.println("First 6 bits: " + f6bits + "\t Last 2 bits: " + l2bits);				
 		
 		if (player_cell.getDiameter() >= 2){ // reproduce whenever possible
-
-			Random rand = new Random();
 			
 			// Use code below if want to have different first 6 bits and last 2 bits
 			//byte memory1 = (byte) ((f6bits << 2) | (0x03 & l2bits)); //First daughter keeps same strategy
@@ -73,38 +71,47 @@ public class Player implements slather.sim.Player {
 			}
 		}
 		else{
+			LinkedList<Integer> possibleAngles = new LinkedList<Integer>();
+			// first take care of special case between first and last cell
 			int maxDiff = angleList.get(0)-angleList.get(angleList.size()-1)+360;
-			int index = angleList.size()-1;
+			int bisectAngle = angleList.get(angleList.size()-1) + maxDiff/2;
+			possibleAngles.addFirst(bisectAngle);
+			
 			for(int i=0; i<angleList.size()-1; i++){
 				//Don't consider if causes collision
-				int bisectAngle = ((angleList.get(i+1) + angleList.get(i)) % 360) / 2; 
+				bisectAngle = ((angleList.get(i+1) + angleList.get(i)) % 360) / 2; 
 				if (collides(player_cell, extractVectorFromAngle(bisectAngle), nearby_cells, nearby_pheromes)){
 					continue;
 				}
 				
 				int thisDiff = angleList.get(i+1) - angleList.get(i);
 				if(	thisDiff > maxDiff	){
+					possibleAngles.addFirst(bisectAngle); // sorting angles list from best to worst
 					maxDiff = thisDiff;
-					index = i;
 				}
 			}
-			int finalAngle = angleList.get(index) + maxDiff/2;
-			finalAngle %= 360;
-			memory = (byte) (finalAngle/2);
-			Point vector = extractVectorFromAngle(finalAngle);
-			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
-				return new Move(vector, memory);
+			for(int j=0; j<possibleAngles.size(); j++){
+				int best_angle = possibleAngles.get(j);
+				Point vector = extractVectorFromAngle(best_angle);
+				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+					memory = (byte) (best_angle/2); // keep within 8 bits
+					return new Move(vector, memory);
+				}
 			}
 		}	
-		
+	
 		// If there was a collision, try
 		// random directions to go in until one doesn't collide
-		for (int i = 0; i < 10; i++) {
+		for (int i = 0; i < 4; i++) {
 			memory = (byte) gen.nextInt(180);
 			Point vector = extractVectorFromAngle(memory*2);
 			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
 				return new Move(vector, memory);
 			}
+		}
+		Point vector = extractVectorFromAngle((memory+90)%360);
+		if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+			return new Move(vector, memory);
 		}
 
 		// if all tries fail, just chill in place
