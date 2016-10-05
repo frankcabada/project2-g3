@@ -34,8 +34,7 @@ public class Player implements slather.sim.Player {
 //		System.out.println("Memory is: " + memory);
 //		System.out.println("First 6 bits: " + f6bits + "\t Last 2 bits: " + l2bits);				
 		
-		if (player_cell.getDiameter() >= 2){ // reproduce whenever possible
-			
+		if (player_cell.getDiameter() >= 2){ // reproduce whenever possible			
 			// Use code below if want to have different first 6 bits and last 2 bits
 			//byte memory1 = (byte) ((f6bits << 2) | (0x03 & l2bits)); //First daughter keeps same strategy
 			//byte memory2 = (byte) ((f6bits << 2) | (0x03 & (l2bits)));
@@ -64,9 +63,9 @@ public class Player implements slather.sim.Player {
 		}
 		else if(angleList.size()==1){
 			int finalAngle = (angleList.get(0)+180)%360;
-			memory = (byte) (finalAngle/2);
 			Point vector = extractVectorFromAngle(finalAngle);
 			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+				memory = (byte) (finalAngle/2);
 				return new Move(vector, memory);
 			}
 		}
@@ -100,18 +99,21 @@ public class Player implements slather.sim.Player {
 			}
 		}	
 	
-		// If there was a collision, try
-		// random directions to go in until one doesn't collide
-		for (int i = 0; i < 4; i++) {
-			memory = (byte) gen.nextInt(180);
-			Point vector = extractVectorFromAngle(memory*2);
-			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
-				return new Move(vector, memory);
+		// If there was a collision, try a few random directions to go in until one doesn't collide
+		for (int i = 0; i < 10; i++) {
+			int rand_angle = gen.nextInt(360);
+			Point rand_vector = extractVectorFromAngle(rand_angle);
+			if (!collides(player_cell, rand_vector, nearby_cells, nearby_pheromes)){
+				memory = (byte) (rand_angle/2);
+				return new Move(rand_vector, memory);
 			}
 		}
-		Point vector = extractVectorFromAngle((memory+90)%360);
-		if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
-			return new Move(vector, memory);
+
+		// If no successful random direction, try reversing
+		memory = (byte) ((memory+90) % 360);
+		Point rev_vector = extractVectorFromAngle(memory);
+		if (!collides(player_cell, rev_vector, nearby_cells, nearby_pheromes)){
+			return new Move(rev_vector, memory);
 		}
 
 		// if all tries fail, just chill in place
