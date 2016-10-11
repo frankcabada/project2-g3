@@ -1,79 +1,5 @@
 package slather.g6;
 
-/*<<<<<<< HEAD
-import java.util.Iterator;
-import java.util.Random;
-import java.util.Set;
-
-import slather.sim.Cell;
-import slather.sim.Move;
-import slather.sim.Pherome;
-import slather.sim.Point;
-
-public class Player implements slather.sim.Player {
-
-	Random gen = new Random();
-
-	@Override
-	public void init(double d, int t) {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public Move play(Cell player_cell, byte memory, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
-		if (player_cell.getDiameter() >= 2) // reproduce whenever possible
-			return new Move(true, (byte) -1, (byte) -1);
-		if (memory > 0) { // follow previous direction unless it would cause a
-							// collision
-			Point vector = extractVectorFromAngle((int) memory);
-			// check for collisions
-			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes))
-				return new Move(vector, memory);
-		}
-		// if all tries fail, find best path and go
-		return findBestPath(player_cell, memory, nearby_cells, nearby_pheromes);
-	}
-
-	public Move findBestPath(Cell player_cell, byte memory, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
-		if (memory > 0) {
-			// there was a collision. find the best path to go
-			for (int i = memory + 90; i < 360; i++) {
-				// int arg = gen.nextInt(180) + 1;
-				Point vector = extractVectorFromAngle(i);
-				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes))
-					return new Move(vector, (byte) i);
-			}
-			for (int i = memory + 90; i > 0; i--) {
-				// int arg = gen.nextInt(180) + 1;
-				Point vector = extractVectorFromAngle(i);
-				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes))
-					return new Move(vector, (byte) i);
-			}
-		} else {
-			// there was no memory before. find the best path to go
-			for (int i = 0; i < 360; i++) {
-				int arg = gen.nextInt(180) + 1;
-				Point vector = extractVectorFromAngle(arg);
-				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes))
-					return new Move(vector, (byte) arg);
-			}
-		}
-
-		// if all tries fails, find the farthest pherome position and go
-		Point farthestPheromePoint = player_cell.getPosition();
-		for (Pherome p : nearby_pheromes) {
-			if (!collides(player_cell, p.getPosition(), nearby_cells, nearby_pheromes)) {
-				if (player_cell.getPosition().distance(p.getPosition()) > player_cell.getPosition()
-						.distance(farthestPheromePoint)) {
-					farthestPheromePoint = p.getPosition();
-				}
-			}
-		}
-		return new Move(farthestPheromePoint, (byte) 0);
-	}
-
-=======*/
 import slather.sim.Cell;
 import slather.sim.Point;
 import slather.sim.Move;
@@ -85,28 +11,97 @@ public class Player implements slather.sim.Player {
 	private Random gen;
 	private double d;
 	private int t;
+	
+	private int turn;
+	private double diameter;	/* used in determining the initial # of cells */
+	private int initialCells;
+	private int totalCells;
+	private boolean determine;
+	
+	private boolean squaring;
+	private int movesPerSide;
+	private int totalOfSides;
+	private MaxAnglePlayer maxAnglePlayer = new MaxAnglePlayer();
 
-	public void init(double d, int t) {
+	public void init(double d, int t, int sideLength) {
 		gen = new Random();
 		this.d = d;
 		this.t = t;
+		this.turn = 0;
+		this.diameter = 0;
+		this.initialCells = 0;
+		this.determine = true;
+		
+		this.movesPerSide = t / 4;	// 4 for the # of sides in a square
+		this.totalOfSides = movesPerSide * 4;
+		this.squaring = false;
 	}
 
 	public Move play(Cell player_cell, byte memory, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
-		if (player_cell.getDiameter() >= 2) // reproduce whenever possible
-			return new Move(true, (byte) -1, (byte) -1);
-		// if (memory > 0) { // follow previous direction unless it would cause a
-		// 					// collision
-		// 	Point vector = extractVectorFromAngle((int) memory);
-		// 	// check for collisions
-		// 	if (!collides(player_cell, vector, nearby_cells, nearby_pheromes))
-		// 		return new Move(vector, memory);
-		// }
+		/* successfully records starting cell count into this.initialCells */
+		/* records heirarchical reproduction count in memory */
+		
+		//uncomment to use max angle player 
+		return maxAnglePlayer.play(player_cell, memory, nearby_cells, nearby_pheromes);
+		/*if (turn == 0) {
+			this.diameter = player_cell.getDiameter();
+			this.initialCells++;
+		}
+		
+		if (determine == true && turn != 0) {
+			if (player_cell.getDiameter() == this.diameter) {
+				this.initialCells++;
+			} else {
+				determine = false;
+				this.totalCells = this.initialCells;
+				 debug 
+				System.out.println("Number of starting cells = " + this.initialCells);
+			}
+		}
+		turn++;
+		
+		if (player_cell.getDiameter() >= 2) { // reproduce whenever possible
+			
+			int daughter_mem = Math.abs(memory - 90) % 180;
+			
+			 debug 
+			System.out.printf("memory = %d\n", memory);
+			System.out.printf("daughter mem = %d\n", daughter_mem);
+			
+			this.totalCells++;
+			
+			return new Move(true, memory, (byte) daughter_mem);
+		}
+		
+		 squaring strategy 
+		if (squaring) {
+			int tryNum = 0;
+			Point vector = null;
 
-		/*
+			while (tryNum < 4) {
+				vector = this.squaringStrat(player_cell, memory);
+				if (this.collides(player_cell, vector, nearby_cells, nearby_pheromes)) {
+					memory += this.movesPerSide;
+					tryNum++;
+				} else {
+					memory++;
+					break;
+				}
+			}
+			// double curX = player_cell.getPosition().x;
+			// double curY = player_cell.getPosition().y;
+			int angle = this.extractAngleFromVector(vector, player_cell);
+			Point newVector = this.extractVectorFromAngle(angle);
+			// System.out.printf("move from (%f, %f) ", curX, curY);
+			// System.out.printf("to (%f, %f)\n", newVector.x, newVector.y);
+			return new Move(newVector, memory);
+		}
+		
+
+		
 		 * go in opposite direction of opposing cells, doesn't currently use the
 		 * memory
-		 */
+		 
 		Set<Cell> friendly_cells = new HashSet<Cell>();
 		Set<Cell> enemy_cells = new HashSet<Cell>();
 		Set<Cell> two_closest_enemies = new HashSet<Cell>();
@@ -121,11 +116,11 @@ public class Player implements slather.sim.Player {
 				}
 			}
 
-			/*
+			
 			 * use the closest 2 enemy cells to determine your direction of
 			 * movement. use 1 enemy cell if there is only one enemy in your
 			 * vicinity
-			 */
+			 
 			Point vector;
 			ArrayList<Cell> sortedCells = this.sort(enemy_cells, player_cell);
 			if(!sortedCells.isEmpty()) {
@@ -141,9 +136,19 @@ public class Player implements slather.sim.Player {
 					return new Move(vector, memory);
 			}
 		}
-
-		// if no previous direction specified or if there was a collision, try
-		// random directions to go in until one doesn't collide
+		
+		 follow previous direction unless it would cause a collision 
+		if (memory > 0) { 
+			Point vector = extractVectorFromAngle((int) memory);
+			// check for collisions
+			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes))
+				return new Move(vector, memory);
+		}
+		
+		 
+		 * if no previous direction specified or if there was a collision, try
+		 * random directions to go in until one doesn't collide 
+		 
 		for (int i = 0; i < 4; i++) {
 			int arg = gen.nextInt(180) + 1;
 			Point vector = extractVectorFromAngle(arg);
@@ -152,7 +157,7 @@ public class Player implements slather.sim.Player {
 		}
 
 		// if all tries fail, just chill in place
-		return new Move(new Point(0, 0), (byte) 0);
+		return new Move(new Point(0, 0), memory);*/
 	}
 
 	/* sort cells from smallest distance from player_cell to greatest */
@@ -230,8 +235,10 @@ public class Player implements slather.sim.Player {
 		return false;
 	}
 
-	public Point extractVectorFromAngle(int angel) {
-		double theta = Math.toRadians(2 * angel);
+	// convert an angle (in 2-deg increments) to a vector with magnitude
+	// Cell.move_dist (max allowed movement distance)
+	private Point extractVectorFromAngle(int arg) {
+		double theta = Math.toRadians(2 * (double) arg);
 		double dx = Cell.move_dist * Math.cos(theta);
 		double dy = Cell.move_dist * Math.sin(theta);
 		return new Point(dx, dy);
@@ -263,6 +270,33 @@ public class Player implements slather.sim.Player {
 		if (angle < 0)
 			angle += 2 * Math.PI;
 		return (int) (Math.toDegrees(angle) / 2);
+	}
+	
+	/*
+	 * squaring strategy only worthwhile if t >= 4.
+	 * uses memory to determine up, down, left or right.
+	 */
+	private Point squaringStrat(Cell current, Byte memory) {
+
+		int dir = memory % this.totalOfSides;
+		int right = this.movesPerSide;
+		int down = right * 2;
+		int left = right * 3;
+		int up = right * 4;
+
+		double x = current.getPosition().x;
+		double y = current.getPosition().y;
+
+		if (dir < right) {
+			x += Cell.move_dist;
+		} else if (dir < down) {
+			y -= Cell.move_dist;
+		} else if (dir < left) {
+			x -= Cell.move_dist;
+		} else if (dir < up) {
+			y += Cell.move_dist;
+		}
+		return new Point(x, y);
 	}
 
 }

@@ -22,7 +22,7 @@ public class Player implements slather.sim.Player {
     private int SHAPE_MEM_USAGE; // CONSTANTS - calculate this based on t
     private int EFFECTIVE_SHAPE_SIZE; // CONSTANTS - actual number of sides to our shape
 
-    
+
     public void init(double d, int t, int sideLength) {
 	gen = new Random();
 	this.d = d;
@@ -65,9 +65,10 @@ public class Player implements slather.sim.Player {
 
 
 
-         if (player_cell.getDiameter() >= 2) // reproduce whenever possible
-            return new Move(true, (byte) 0b10000000, (byte) 0);
-
+         if (player_cell.getDiameter() >= 2) {
+            memory = (byte)(memory & 0b10001111);
+            return new Move(true, (byte) (memory | 0b10000000), (byte) memory);
+         }
 
 
 
@@ -83,16 +84,42 @@ public class Player implements slather.sim.Player {
              // and then use that to move a bit. add a little bit of aggressiveness
              // if there are several cells nearby
 
+             int count = memory >> 4;
+
+             // begin spreading out
+
              double vectx = 0.0;
              double vecty = 0.0;
+             double vectfx = 0.0;
+             double vectfy = 0.0;
+             int fccnt = 0;
              for (Cell nc : nearby_cells) {
-                 double weight = 1.0;
-                 if (nc.player == player_cell.player)
-                    weight = 0.9;
-                 else
-                    weight = 1.1;
+
+                 // get their positions
                  Point ncp = nc.getPosition();
                  Point pcp = player_cell.getPosition();
+
+                 // add some weights, and get distances
+                 double weight;
+                 double distx = Math.abs(ncp.x - pcp.x);
+                 double disty = Math.abs(ncp.y - pcp.y);
+                 double distance = player_cell.distance(nc);
+
+
+                 // use distance and type or set weights
+                 if (nc.player == player_cell.player) {
+                    weight = 0.3;
+                    double fdistx = Math.abs(ncp.x - pcp.x);
+                    double fdisty = Math.abs(ncp.y - pcp.y);
+                    vectfx = vectfx + ((ncp.x - pcp.x) * Math.pow(0.5, 2*fdisty));
+                    vectfy = vectfy + ((ncp.y - pcp.y) * Math.pow(0.5, 2*fdistx));
+                    fccnt++;
+                 } else {
+                     if (distance > 1.1)
+                        weight = -0.005;
+                    else
+                        weight = 0.1;
+                 }
                  vectx = vectx + weight*(ncp.x - pcp.x);
                  vecty = vecty + weight*(ncp.y - pcp.y);
              }
@@ -104,55 +131,62 @@ public class Player implements slather.sim.Player {
                  avg_x = avg_x * (Cell.move_dist / hyp);
                  avg_y = avg_y * (Cell.move_dist / hyp);
              }
-             Point nextPoint = new Point(-avg_x, -avg_y);
-             int count = 0;
-             int maxTries = 100;
-             while ((nextPoint.x == 0 && nextPoint.y == 0)
-                    || collides(player_cell, nextPoint, nearby_cells, nearby_pheromes)) {
-                 // if tried maximum # of times without success, just stay still
-                 if (count == maxTries) {
-                     nextPoint = new Point(0,0);
-                     break;
-                 }
-                 int angle = gen.nextInt(120);
-                 nextPoint = extractVectorFromAngle(angle);
+
+             fccnt = Math.max(fccnt, 1);
+             if (vectfx == 0) vectfx = 1;
+             if (vectfy == 0) vectfy = 1;
+             if (count == 3) {
+                 avg_x = avg_x - 0.5*(vectfy / (double)fccnt);
+                 avg_y = avg_y + 0.5*(vectfx / (double)fccnt);
+                 count = 7;
+             } else if (count == 7) {
+                 avg_x = avg_x + 0.5*(vectfy / (double)fccnt);
+                 avg_y = avg_y - 0.5*(vectfx / (double)fccnt);
+                 count = 3;
+             } else {
                  count++;
              }
+             Point nextPoint = new Point(-avg_x, -avg_y);
+             int count2 = 0;
+             int maxTries = 100;
+             if (collides(player_cell, nextPoint, nearby_cells, nearby_pheromes)) {
+                // if tried maximum # of times without success, just stay still
+                //nextPoint = new Point(0,0);
+            }
+
+
+             System.out.println("YOu are here");
+             memory = (byte)((memory & 0b10001111) + (count << 4));
+             memory = (byte)(memory | 0b10000000);
+             s = String.format("%8s", Integer.toBinaryString(memory & 0xFF)).replace(' ','0');
+             System.out.println("Defender new Memory byte: " + s);
+
              return new Move(nextPoint, memory);
 
 
-         } // end square walker strategy
 
 
-
-
-
-         else {
+         } else {
 
             /* Random walker strategy:
+               Uses "widest angle" strategy inspired by g5 (& others?)
                Move away from cells that are too close (specified by AVOID_DIST)
                If no closeby friendly cells to avoid, act like default player (move in straight lines)
              */
-            int prevAngle = memory & 0b01111111;
+            int prevAngle = memory & 0b00001111;
 
+            List<Point> neighbors = new ArrayList<Point>();
             Iterator<Cell> cell_it = nearby_cells.iterator();
-            double sumX = 0;
-            double sumY = 0;
-            int count = 0;
-            Point vector;
 
-            // calculate avg position of nearby cells
+            // get all nearby cell position vectors
             while (cell_it.hasNext()) {
                 Cell curr = cell_it.next();
                 if (player_cell.distance(curr) > AVOID_DIST) // don't worry about far away cells
                     continue;
                 Point currPos = curr.getPosition();
-                sumX += currPos.x;
-                sumY += currPos.y;
-                count++;
+                neighbors.add(new Point(currPos.x - currentPosition.x, currPos.y - currentPosition.y));
             }
-
-            // add unfriendly pheromes
+            // do pheromes too why not
             Iterator<Pherome> ph_it = nearby_pheromes.iterator();
             while (ph_it.hasNext()) {
                 Pherome curr = ph_it.next();
@@ -161,15 +195,13 @@ public class Player implements slather.sim.Player {
                 if (player_cell.distance(curr) > AVOID_DIST)
                     continue;
                 Point currPos = curr.getPosition();
-                sumX += currPos.x;
-                sumY += currPos.y;
-                count++;
+                neighbors.add(new Point(currPos.x - currentPosition.x, currPos.y - currentPosition.y));
             }
 
-            if (count == 0) { // case: no cells to move away from
+            if (neighbors.size() < 1) { // case: no cells or only one cell to move away from
                 // if had a previous direction, keep going in that direction
                 if (prevAngle > 0) {
-                    vector = extractVectorFromAngle( (int)prevAngle);
+                    Point vector = extractVectorFromAngle( (int)prevAngle);
                     if (!collides( player_cell, vector, nearby_cells, nearby_pheromes)) {
                         nextMove = new Move(vector, memory);
                     }
@@ -177,23 +209,43 @@ public class Player implements slather.sim.Player {
 
                 // if will collide or didn't have a previous direction, pick a random direction generate move
                 if (nextMove == null) {
-                    int newAngle = gen.nextInt(120);
+                    int newAngle = gen.nextInt(12);
                     Point newVector = extractVectorFromAngle(newAngle);
-                    byte newMemory = (byte) (newAngle);
+                    byte newMemory = (byte) (newAngle & 0b00001111);
                     nextMove = new Move(newVector, newMemory);
                 }
-            } else { // case: cells too close, move in opposite direction
-                double avgX = sumX / ((double) count);
-                double avgY = sumY / ((double) count);
+            } else { // case: cells too close, move in direction of the widest angle
+                neighbors.sort(new Comparator<Point>() {
+                    public int compare(Point v1, Point v2) {
+                        double a1 = getAngleFromVector(v1);
+                        double a2 = getAngleFromVector(v2);
 
-                double towardsAvgX = avgX - currentPosition.x;
-                double towardsAvgY = avgY - currentPosition.y;
+                        if (a1 == a2) return 0;
+                        else if (a1 < a2) return -1;
+                        else return 1;
+                    }
+                });
 
-                double distanceFromAvg = Math.hypot(towardsAvgX, towardsAvgY);
+                // find widest angle
+                double lowerAngle = prevAngle; // smaller angle that borders the widest angle
+                double widestAngle = 0;
+                for (int i = 1; i < neighbors.size(); i++) {
+                    double a1 = getAngleFromVector(neighbors.get(i-1));
+                    double a2 = getAngleFromVector(neighbors.get(i));
+                    double deltAngle = a2 - a1;
+                    if (deltAngle > widestAngle) {
+                        widestAngle = deltAngle;
+                        lowerAngle = a1;
+                    }
+                }
 
-                double awayX = (-(towardsAvgX)/distanceFromAvg) * Cell.move_dist;
-                double awayY = (-(towardsAvgY)/distanceFromAvg) * Cell.move_dist;
+                // calculate direction to go (aim for the "middle" of the widest angle)
+                double destAngle = lowerAngle + widestAngle / 2;
 
+                double destX = Cell.move_dist * Math.cos(destAngle);
+                double destY = Cell.move_dist * Math.sin(destAngle);
+
+                /* this is probably not necessary anymore?
                 // check if cells are in the direction we are moving toward
                 cell_it = nearby_cells.iterator();
                 while (cell_it.hasNext()) {
@@ -224,11 +276,12 @@ public class Player implements slather.sim.Player {
                         }
                     }
                 }
+                */
 
-                // clear the previous vector bits
-                int newAngle = 0;
-                Point newVector = new Point(awayX, awayY);
-                byte newMemory = (byte) (newAngle);
+                // replace the previous vector bits with new direction
+                int newAngle = (int) (Math.toDegrees(destAngle) / 30);
+                Point newVector = new Point(destX, destY);
+                byte newMemory = (byte) (newAngle & 0b00001111);
                 nextMove = new Move(newVector, newMemory);
             }
 
@@ -236,18 +289,18 @@ public class Player implements slather.sim.Player {
 
             if (collides(player_cell, nextMove.vector, nearby_cells, nearby_pheromes)) {
                 nextMove = null;
-                int arg = gen.nextInt(120);
+                int arg = gen.nextInt(12);
                 // try 20 times to avoid collision
                 for (int i = 0; i < 20; i++) {
                     Point newVector = extractVectorFromAngle(arg);
                     if (!collides(player_cell, newVector, nearby_cells, nearby_pheromes)) {
-                        byte newMemory = (byte) (arg);
+                        byte newMemory = (byte) (arg & 0b00001111);
                         nextMove = new Move(newVector, newMemory);
                         break;
                     }
                 }
                 if (nextMove == null) { // if still keeps colliding, stay in place
-                    nextMove = new Move(new Point(0,0), (byte) 0);
+                    nextMove = new Move(new Point(0,0), (byte) memory);
                 }
             } // end check candidate nextMove collision
         } // end random walker
@@ -278,10 +331,14 @@ public class Player implements slather.sim.Player {
 
     // convert an angle (in 3-deg increments) to a vector with magnitude Cell.move_dist (max allowed movement distance)
     private Point extractVectorFromAngle(int arg) {
-	double theta = Math.toRadians( 3* (double)arg );
+	double theta = Math.toRadians(30 * (double)arg);
 	double dx = Cell.move_dist * Math.cos(theta);
 	double dy = Cell.move_dist * Math.sin(theta);
 	return new Point(dx, dy);
+    }
+
+    private double getAngleFromVector(Point vector) {
+        return Math.atan2(vector.y, vector.x);
     }
 
     /* Gets vector based on direction (which side of the shape cell will move to)
