@@ -8,40 +8,67 @@ import slather.sim.Point;
 
 public class ToolBox {
 	
+	public static double EXPLORER_PROBABILITY = 0.6;
+	
+	/*
+	 * Due to wrap around, the difference between two points in coordinate x and
+	 * y should be in range (-50,50]
+	 */
+	public static Point pointDistance(Point me, Point you) {
+		double diffX = you.x - me.x;
+		if (diffX > 50)
+			diffX -= 100;
+		else if(diffX<-50)
+			diffX+=100;
+		double diffY = you.y - me.y;
+		if (diffY > 50)
+			diffY -= 100;
+		else if(diffY<-50)
+			diffY+=100;
+		return new Point(diffX, diffY);
+	}
+
 	/* Return an angle between 0~2PI */
-	public static double getCosine(Point myPoint,Point otherPoint){
-		double diffX=otherPoint.x-myPoint.x;
-		double diffY=otherPoint.y-myPoint.y;
-		double diffDist=Math.sqrt(diffX*diffX+diffY*diffY);
+	public static double getCosine(Point myPoint, Point otherPoint) {
+		double diffX = otherPoint.x - myPoint.x;
+		double diffY = otherPoint.y - myPoint.y;
+		double diffDist = Math.sqrt(diffX * diffX + diffY * diffY);
 		/* Avoid divide zero */
-		if(diffDist==0.0)
+		if (diffDist == 0.0)
 			return 0.0;
-		
-		double angle=Math.acos(diffY/diffDist);
-		if(otherPoint.x<myPoint.x)
-			return 2*Math.PI-angle;
-		else if(otherPoint.x>myPoint.x)
+
+		// double angle=Math.acos(diffY/diffDist);
+		double angle = Math.asin(diffY / diffDist);
+		if (otherPoint.y < myPoint.y)
+			if (otherPoint.x >= myPoint.x)
+				return 2 * Math.PI + angle;
+			else
+				return Math.PI - angle;
+		else if (otherPoint.y > myPoint.y)
 			return angle;
-		else{/*Same x*/
-			if(otherPoint.y>=myPoint.y)
+		else {/* Same x */
+			if (otherPoint.x >= myPoint.x)
 				return 0.0;
-			else 
+			else
 				return Math.PI;
 		}
 	}
+
 	/* Return a angle subtraction result between 0~2PI */
-	public static double angleDiff(double startAngle,double endAngle){
-		if(endAngle>startAngle)
-			return endAngle-startAngle;
+	public static double angleDiff(double startAngle, double endAngle) {
+		if (endAngle > startAngle)
+			return endAngle - startAngle;
 		else
-			return 2*Math.PI+endAngle-startAngle;
+			return 2 * Math.PI + endAngle - startAngle;
 	}
-	
-	public static Point newDirection(Point me,double theta){
-		double diffX=Math.sin(theta);
-		double diffY=Math.cos(theta);
-		return new Point(me.x+diffX,me.y+diffY);
+
+	public static Point newDirection(Point me, double theta) {
+		double diffX = Math.cos(theta);
+		double diffY = Math.sin(theta);
+//		return new Point(me.x + diffX, me.y + diffY);
+		return new Point(diffX,diffY);
 	}
+
 	/* Normalize the distance to default of 1mm */
 	public static Point normalizeDistance(Point... points) {
 		double offX = 0.0;

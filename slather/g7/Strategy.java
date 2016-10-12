@@ -8,8 +8,6 @@ import slather.sim.Pherome;
 
 public interface Strategy {
 	
-	public Memory getNewMemoryObject();
-	
 	public Memory generateNextMoveMemory(Memory currentMemory);
 	public Memory generateFirstChildMemory(Memory currentMemory);
 	public Memory generateSecondChildMemory(Memory currentMemory, Memory firstChildMemory);

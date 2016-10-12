@@ -5,22 +5,13 @@ import java.util.Random;
 // TODO This is very inefficient. Need to use bit operations to improve performance
 public class DefenderMemory implements Memory {
 	public String memStr;
-	public int circleBits;
-	public int defOrExp;
+	private int circleBits;
+	private int defOrExp;
 
 	private DefenderMemory() {
 	}
 
-	/*
-	 * Call this function at the beginning of every other function to account
-	 * for all changes to object fields.
-	 */
-	private void updateMemStr() {
-		this.memStr = blockToString(defOrExp, 1) + blockToString(circleBits, 7);
-	}
-
 	public byte getByte() {
-		updateMemStr();
 
 		if (memStr.length() != 8) {
 			System.out.println("The memory is converted to " + memStr.length() + " bits: " + memStr);
@@ -29,14 +20,13 @@ public class DefenderMemory implements Memory {
 
 		int integer = Integer.parseInt(memStr, 2);
 		if (integer > 127) {
-			integer = 256 - integer;
+			integer = integer - 256;
 		}
 		byte b = (byte) integer;
 		return b;
 	}
 
 	public char getMemoryAt(int index) {
-		updateMemStr();
 		if (index > memStr.length())
 			return ' ';
 		return memStr.charAt(index);
@@ -47,7 +37,6 @@ public class DefenderMemory implements Memory {
 	 * exclusively
 	 */
 	public int getMemoryBlock(int start, int end) {
-		updateMemStr();
 		String sub = memStr.substring(start, end);
 		int val = Integer.parseInt(sub, 2);
 		return val;
@@ -66,11 +55,11 @@ public class DefenderMemory implements Memory {
 	public void initialize(int circleDefinition) {
 		this.defOrExp = 1; // 1 impies def
 		this.circleBits = circleDefinition;
+		this.memStr = blockToString(defOrExp, 1) + blockToString(circleBits, 7);
 	}
 
 	@Override
 	public String getMemoryString() {
-		updateMemStr();
 		return this.memStr;
 	}
 
@@ -96,17 +85,15 @@ public class DefenderMemory implements Memory {
 	}
 
 	@Override
-	public Memory generateNextMoveMemory() {
-
+	public DefenderMemory generateNextMoveMemory() {
 		DefenderMemory memoryObject = getNewObject();
-		memoryObject.initialize(this.getByte());
 		int currentCircle = this.circleBits;
-		if (currentCircle == 0) {
-			memoryObject.circleBits = 127;
+		if (currentCircle == Player.num_def_sides) {
+			memoryObject.initialize(0);
 		} else {
-			memoryObject.circleBits = currentCircle--;
+			memoryObject.initialize(this.circleBits + 1);
 		}
-		memoryObject.defOrExp = 1;
+		
 		return memoryObject;
 
 	}
@@ -117,31 +104,35 @@ public class DefenderMemory implements Memory {
 		Memory childMem;
 		double num = rand.nextDouble();
 		
-		if (num > 0.7) {
+		if (num > ToolBox.EXPLORER_PROBABILITY) {
 			childMem = DefenderMemory.getNewObject();
-			((DefenderMemory)childMem).initialize(127);
+			((DefenderMemory)childMem).initialize(0);
 		} else {
 			childMem = ExplorerMemory.getNewObject();
-			((ExplorerMemory)childMem).initialize(1, 0, 15);
+			((ExplorerMemory)childMem).initialize(0, 15, 1);
 		}
 		return childMem;
 	}
 
 	@Override
-	public Memory generateSecondChildMemory(Memory currentMemory) {
+	public Memory generateSecondChildMemory(Memory firstChildMemory) {
 
 		Random rand = new Random();
 		Memory childMem;
 		double num = rand.nextDouble();
 		
-		if (num > 0.7) {
+		if (num > ToolBox.EXPLORER_PROBABILITY) {
 			childMem = DefenderMemory.getNewObject();
-			((DefenderMemory)childMem).initialize(127);
+			((DefenderMemory)childMem).initialize(0);
 		} else {
 			childMem = ExplorerMemory.getNewObject();
-			((ExplorerMemory)childMem).initialize(1, 0, 15);
+			((ExplorerMemory)childMem).initialize(0,15,1);
 		}
 		
 		return childMem;
+	}
+
+	public int getCircleBits() {
+		return this.circleBits;
 	}
 }
