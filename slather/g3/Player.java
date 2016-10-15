@@ -13,7 +13,7 @@ public class Player implements slather.sim.Player {
     private int t;
     private int side_length;
     private final int CLOSE_RANGE_VISION = 5;
-    private final int ANGLE_PRECISION =2;
+    private final int ANGLE_PRECISION = 2;
 
     public void init(double d, int t, int side_length) {
 		gen = new Random();
@@ -280,8 +280,8 @@ public class Player implements slather.sim.Player {
 			double angle = Math.atan(dY/dX);
 			if(dX>=0 && dY>=0); //Do nothing
 			if(dX>=0 && dY<0) angle += 2*Math.PI;
-			if(dX<0 && dY>=0) angle = Math.PI - angle;
-			if(dX<0 && dY<0) angle = Math.PI - angle;
+			if(dX<0 && dY>=0) angle += Math.PI;
+			if(dX<0 && dY<0) angle += Math.PI;
 			angleToCellMap.put((int)Math.toDegrees(angle), c);
 		}
 		return angleToCellMap;
