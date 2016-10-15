@@ -186,6 +186,79 @@ public class Player implements slather.sim.Player {
 		return (byte) (intToWrite & 0xff);
 	}
 	
+
+	private Point extractVectorFromAngleWithScalar(int arg, float f) {
+		double theta = Math.toRadians(1 * (double) arg); //We need bigger circles!
+		double dx = f*Cell.move_dist * Math.cos(theta);
+		double dy = f*Cell.move_dist * Math.sin(theta);
+		return new Point(dx, dy);
+	}
+	
+	private int FindBestAngleMoveLazy(Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes, float scalar){
+		boolean collides[] = new boolean[360/ANGLE_PRECISION];
+		for(int i=0; i<360/ANGLE_PRECISION; i++){
+			Point vector = extractVectorFromAngleWithScalar(i*ANGLE_PRECISION, scalar);
+			if (collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+				collides[i] = true;
+			}
+			else{
+				collides[i] = false;
+			}
+		}
+		
+		int falseSubStringLength[] = new int[360/ANGLE_PRECISION];
+		for(int i=360/ANGLE_PRECISION - 1; i >=0; i--){
+			if(i==360/ANGLE_PRECISION - 1)
+				falseSubStringLength[i] = 0;
+			else if(collides[i]==true)
+				falseSubStringLength[i]=0;
+			else{
+				falseSubStringLength[i] = falseSubStringLength[i+1] + 1;
+			}
+		}
+		
+		//Check if all One
+		boolean notAllZero = true;;
+		for(int i=0; i<360/ANGLE_PRECISION - 1; i++){
+			if(falseSubStringLength[i]==0)
+				notAllZero = false;
+		}
+		if(notAllZero) //Return -1, tell cell to go by memory
+			return -1;
+		
+		//Account for the wrap-around
+		falseSubStringLength[360/ANGLE_PRECISION-1] = (collides[360/ANGLE_PRECISION-1]) ? 0 : 1;
+		
+		for(int i=360/ANGLE_PRECISION - 1; i >=0; i--){
+			if(collides[i]==true)
+				break;
+			else{
+				falseSubStringLength[i] += falseSubStringLength[0];
+			}
+		}
+		
+		int maxIndex=-1;
+		for(int i=0; i<360/ANGLE_PRECISION; i++){
+			if(maxIndex<0 && falseSubStringLength[i]!=0){
+				maxIndex = i;
+			}
+			else if(maxIndex >=0 && falseSubStringLength[i] > falseSubStringLength[maxIndex]){
+				maxIndex = i;
+			}
+		}
+		
+		ArrayList<Integer> maxScorers = new ArrayList<Integer>();
+		for(int i=0; i<360/ANGLE_PRECISION; i++){
+			if(falseSubStringLength[i] == falseSubStringLength[maxIndex]){
+				maxScorers.add(i);
+			}
+		}
+		maxIndex = maxScorers.get(gen.nextInt(maxScorers.size()));
+		
+		return ((maxIndex+falseSubStringLength[maxIndex]/2)*ANGLE_PRECISION)%360;
+		
+	}
+	
 	
 	//Threshold is negative if we want to ignore it
  	private TreeMap<Integer, Cell> generateMapOfNearbyCells(Cell player_cell, Set<Cell> nearby_cells, boolean ignoreSamePlayer, float threshold){
