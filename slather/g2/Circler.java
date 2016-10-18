@@ -14,6 +14,8 @@ public class Circler extends Chiller {
     public double RADIUS;
     public double DELTA_THETA;
 
+    private static final double TWOPI = 2*Math.PI;
+
     public void init(double d, int t, int side_length) {
         System.out.println("Circler init");
 
@@ -22,7 +24,9 @@ public class Circler extends Chiller {
         this.TAIL_LENGTH = t;
         this.BOARD_SIZE = side_length;
 
-        RADIUS = 1.0 * t / (2*Math.PI);
+        getPropertiesSafe();
+
+        RADIUS = this.RADIUS_TO_TAIL_RATIO * t / (TWOPI);
         DELTA_THETA = 1 / RADIUS;
 
     }
@@ -51,8 +55,6 @@ public class Circler extends Chiller {
         return new Move(true, (byte)(memory|ROLE_CIRCLE), memory);
     }
 
-    private static final double TWOPI = 2*Math.PI;
-
     private double byte2angle(byte b) {
         // -128 <= b < 128
         // -1 <= b/128 < 1
@@ -64,18 +66,12 @@ public class Circler extends Chiller {
         final double actualAngle = ((normalizeAngle(a,0) / TWOPI)*this.ANGLE_MAX);
         final int anglePart = (int) (((int)actualAngle) & this.ANGLE_MASK);
         final byte memoryPart = (byte) ( b & ~this.ANGLE_MASK);
-        // System.out.println("angle2byte "+ memoryPart +","+ anglePart +","+ (normalizeAngle(a,0)/TWOPI) +","+ this.ANGLE_MAX +","+ a);
         return (byte) ((anglePart | memoryPart));
     }
 
     private double normalizeAngle(double a, double start) {
-        if( a < start ) {
-            return normalizeAngle( a+TWOPI, start);
-        } else if (a >= (start+TWOPI)) {
-            return normalizeAngle( a-TWOPI, start);
-        } else {
-            return a;
-        }
+        final int num_circles = (int) Math.floor((a - start) / TWOPI);
+        return a + num_circles*TWOPI;
     }
 
     private Vector angle2vector(double a) {

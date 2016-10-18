@@ -11,7 +11,7 @@ import slather.g2.util.Vector;
 
 public class Grider extends Chiller {
 
-    float MIN_DISTANCE;
+    double MIN_DISTANCE;
 
     public void init(double d, int t, int side_length) {
         System.out.println("Grider init");
@@ -19,7 +19,9 @@ public class Grider extends Chiller {
         this.RANDOM_GENERATOR = new Random(System.currentTimeMillis());
         this.BOARD_SIZE = side_length;
 
-        this.MIN_DISTANCE = t;
+        getPropertiesSafe();
+
+        this.MIN_DISTANCE = this.GRID_DIST_TO_TAIL_RATIO * t;
 
     }
 

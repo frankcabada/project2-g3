@@ -6,6 +6,16 @@ import slather.sim.Move;
 import slather.sim.Pherome;
 import java.util.*;
 
+
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Properties;
+
+
 import slather.g2.util.Vector;
 
 public class Player implements slather.sim.Player {
@@ -15,15 +25,36 @@ public class Player implements slather.sim.Player {
     protected int TAIL_LENGTH;
     protected double BOARD_SIZE;
 
-    protected double PROB_CIRCLE = 0.2;
+    protected String CONFIG_FILE_NAME = "player.cfg";
 
-    private Chiller chiller = null;
-    private Circler occupier = null;
-    private Scout scout = null;
+    protected double PROB_CIRCLE;
+    protected double RADIUS_TO_TAIL_RATIO;
+    protected double GRID_DIST_TO_TAIL_RATIO;
+    protected String INITIAL_CLASS;
+    protected String PROB_CLASS;
+    protected String ADJUST_PROB;
+
+    private Player occupier = null;
+    private Player scout = null;
 
     // Initialize here, initialize sub strategies here.
     // Take care to initialize VISION, TAIL_LENGTH, BOARD_SIZE, RANDOM_GENERATOR in your subclass
     // Do not make recursive calls to this init.
+
+    private Player getPlayerInstance(String className) {
+        System.out.println(className);
+        if(className.equals("Scout")) {
+            return new Scout();
+        } else if(className.equals("GridCircler")) {
+            return new GridCircler();
+        } else if(className.equals("Grider")) {
+            return new Grider();
+        } else if(className.equals("Circler")) {
+            return new Circler();
+        } else {
+            return new Chiller();
+        }
+    }
 
     public void init(double d, int t, int side_length) {
         System.out.println("Player init");
@@ -33,15 +64,19 @@ public class Player implements slather.sim.Player {
         this.TAIL_LENGTH = t;
         this.BOARD_SIZE = side_length;
 
-        if (t <= 4) PROB_CIRCLE = 0;
+        getPropertiesSafe();
 
-        chiller = new Chiller();
-        chiller.init(d, t, side_length);
+        if( this.ADJUST_PROB.equals("0WhenTaillessThan5") ){
+            if (t <= 4) {
+                this.PROB_CIRCLE = 0;
+            }
+        }
 
-        occupier = new Circler();
+
+        scout = getPlayerInstance(INITIAL_CLASS);
+        occupier = getPlayerInstance(PROB_CLASS);
+
         occupier.init(d, t, side_length);
-
-        scout = new Scout();
         scout.init(d, t, side_length);
     }
 
@@ -67,7 +102,7 @@ public class Player implements slather.sim.Player {
             }
         } else {
             boolean nextIsCircle = byteIsCircle(memory);
-            // nextIsCircle = false;
+            nextIsCircle = false;
             // if(scout.crowded(player_cell,nearby_cells)){
             //     nextIsCircle = true;
             // }
@@ -84,6 +119,11 @@ public class Player implements slather.sim.Player {
         // System.out.println(move2String(m));
 
         return m;
+    }
+
+
+    public Move reproduce(Cell player_cell, byte memory, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
+        return new Move(true, memory, memory);
     }
 
     // check if moving player_cell by vector collides with any nearby cell or hostile pherome
@@ -119,6 +159,78 @@ public class Player implements slather.sim.Player {
     private boolean byteIsCircle(byte b){
         //System.out.printf("%d %d %d\n",b,ROLE_MASK,ROLE_CIRCLE);
         return (b&ROLE_MASK)==ROLE_CIRCLE;
+    }
+
+
+    private boolean getProperties() {
+        Properties prop = new Properties();
+        InputStream input = null;
+        boolean returnVal;
+        try {
+            input = getClass().getResourceAsStream(CONFIG_FILE_NAME);
+            // input = new FileInputStream(CONFIG_FILE_NAME);
+            prop.load(input);
+            this.PROB_CIRCLE          = Float.parseFloat(prop.getProperty("PROB_CIRCLE"));
+            this.RADIUS_TO_TAIL_RATIO = Float.parseFloat(prop.getProperty("RADIUS_TO_TAIL_RATIO"));
+            this.GRID_DIST_TO_TAIL_RATIO = Float.parseFloat(prop.getProperty("GRID_DIST_TO_TAIL_RATIO"));
+            this.INITIAL_CLASS        = prop.getProperty("INITIAL_CLASS");
+            this.PROB_CLASS           = prop.getProperty("PROB_CLASS");
+            this.ADJUST_PROB          = prop.getProperty("ADJUST_PROB");
+            returnVal = true;
+        } catch (Exception e) {
+            e.printStackTrace();
+            returnVal = false;
+        } finally {
+            if(input!=null) {
+                try {
+                    input.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+        return returnVal;
+    }
+
+    private void setProperties() {
+        Properties prop = new Properties();
+        OutputStream output = null;
+        try {
+            File file = new File( getClass().getResource(CONFIG_FILE_NAME).toURI() );
+            output = new FileOutputStream(file);
+
+            prop.setProperty("PROB_CIRCLE", ""+this.PROB_CIRCLE);
+            prop.setProperty("RADIUS_TO_TAIL_RATIO", ""+this.RADIUS_TO_TAIL_RATIO);
+            prop.setProperty("GRID_DIST_TO_TAIL_RATIO", ""+this.GRID_DIST_TO_TAIL_RATIO);
+            prop.setProperty("INITIAL_CLASS", this.INITIAL_CLASS);
+            prop.setProperty("PROB_CLASS", this.PROB_CLASS);
+            prop.setProperty("ADJUST_PROB", this.ADJUST_PROB);
+            prop.store(output, null);
+
+        } catch (
+            Exception io) {
+            io.printStackTrace();
+        } finally {
+            if(output!=null) {
+                try {
+                    output.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    protected void getPropertiesSafe() {
+        if(!getProperties()){
+            this.PROB_CIRCLE = 0.2;
+            this.RADIUS_TO_TAIL_RATIO = 1.0;
+            this.GRID_DIST_TO_TAIL_RATIO = 1.0;
+            this.INITIAL_CLASS = "Scout";
+            this.PROB_CLASS = "Circler";
+            this.ADJUST_PROB = "0WhenTaillessThan5";
+            setProperties();
+        }
     }
 
 }

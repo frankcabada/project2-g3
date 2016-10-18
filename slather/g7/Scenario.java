@@ -1,0 +1,23 @@
+package slather.g7;
+
+public enum Scenario {
+	MAX_SIZE,
+	ALMOST_REPRODUCTION, 
+	EMPTYNESS,
+	ONE_PHEROMONE, 
+	FRIENDS, 
+	NEARBY_FRIENDS,
+	ENEMIES, 
+	NEARBY_ENEMIES, 
+	CLUSTER_BORDER, 
+	DISPERSED
+}
+
+
+	
+	
+	
+	
+	
+
+	

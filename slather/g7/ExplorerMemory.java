@@ -97,7 +97,7 @@ public class ExplorerMemory implements Memory {
 		
 		ExplorerMemory memoryObject = getNewObject();
 		if (this.opposite == 1){
-			if (this.moveDirectionCountdown == 0){
+			if (this.moveDirectionCountdown == 1){
 				memoryObject.initialize(3, 15, 0);
 			}
 			else{
@@ -107,7 +107,7 @@ public class ExplorerMemory implements Memory {
 			}
 		}
 		else{
-			if (this.moveDirectionCountdown == 0){
+			if (this.moveDirectionCountdown == 1){
 				memoryObject.initialize(0, 15, 1);
 			}
 			else{

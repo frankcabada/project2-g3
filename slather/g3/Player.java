@@ -40,11 +40,11 @@ public class Player implements slather.sim.Player {
 			return new Move(true, memory1, memory2);
 		}
 
-		//ArrayList<Integer> cellAngleList = generateAngleListOfNearbyCells(player_cell,nearby_cells, false);
-		//ArrayList<Integer> pheromeAngleList = generateAngleListOfNearbyPheromes(player_cell,nearby_pheromes, true);
-		//ArrayList<Integer> angleList = new ArrayList<Integer>();
-		//angleList.addAll(cellAngleList);
-		//angleList.addAll(pheromeAngleList);
+		/*ArrayList<Integer> cellAngleList = generateAngleListOfNearbyCells(player_cell,nearby_cells, false);
+		ArrayList<Integer> pheromeAngleList = generateAngleListOfNearbyPheromes(player_cell,nearby_pheromes, true);
+		ArrayList<Integer> angleList = new ArrayList<Integer>();
+		angleList.addAll(cellAngleList);
+		angleList.addAll(pheromeAngleList);*/
 		ArrayList<Integer> angleList = generateAngleList(player_cell, nearby_cells, nearby_pheromes);
 		Collections.sort(angleList);
 //			System.out.println(angleList);

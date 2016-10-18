@@ -7,6 +7,7 @@ import slather.sim.Move;
 import slather.sim.Pherome;
 import java.util.*;
 
+// find largest free angle by sort, escape from self cells and pheromes
 
 public class Player implements slather.sim.Player {
 
@@ -65,19 +66,61 @@ public class Player implements slather.sim.Player {
 
     private ArrayList<GridObject> getNearbyObstacles(Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
         ArrayList<GridObject> nearby_obstacles = new ArrayList<GridObject>();
+        ArrayList<GridObject> nearby_same = new ArrayList<GridObject>();
+        ArrayList<GridObject> nearby_different = new ArrayList<GridObject>();
 
         for (Cell cell : nearby_cells) {
-            nearby_obstacles.add(cell);
+            if (player_cell.getPosition().distance(cell.getPosition()) < 5 * player_cell.getDiameter()){
+                if(cell.player == player_cell.player){
+                    nearby_same.add(cell);
+                }else{
+                    nearby_different.add(cell);
+                }
+                nearby_obstacles.add(cell);
+            } 
         }
 
-        for (Pherome pherome : nearby_pheromes) {
-            if (pherome.player != player_cell.player) {
-                nearby_obstacles.add(pherome);
+		for (Pherome pherome : nearby_pheromes) {
+			if (player_cell.getPosition().distance(pherome.getPosition()) < 5 * player_cell.getDiameter()) {
+				nearby_obstacles.add(pherome);
             }
+		}
+
+        if(nearby_same.size() * 1.5 > nearby_different.size()){
+            return nearby_same;
         }
 
         return nearby_obstacles;
     }
+
+	private ArrayList<GridObject> getNearbyObstaclesEscapeSelf(Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
+		ArrayList<GridObject> nearby_obstacles = new ArrayList<GridObject>();
+        ArrayList<GridObject> nearby_same = new ArrayList<GridObject>();        
+        ArrayList<GridObject> nearby_different = new ArrayList<GridObject>();
+
+		for (Cell cell : nearby_cells) {
+			if (player_cell.getPosition().distance(cell.getPosition()) < 5 * player_cell.getDiameter()){
+                if(cell.player == player_cell.player){
+                    nearby_same.add(cell);
+                }else{
+                    nearby_different.add(cell);
+                }
+                nearby_obstacles.add(cell);
+            } 
+        }
+
+		for (Pherome pherome : nearby_pheromes) {
+			if (player_cell.getPosition().distance(pherome.getPosition()) < 2 * player_cell.getDiameter()  && pherome.player != player_cell.player) {
+                nearby_obstacles.add(pherome);
+            }
+		}
+
+        if(nearby_same.size() * 1.5 > nearby_different.size()){
+            return nearby_same;
+        }
+
+		return nearby_obstacles;
+	}
 
     private Move getDefaultMove(Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
         // if no previous direction specified or if there was a collision, try random directions to go in until one doesn't collide
@@ -145,12 +188,45 @@ public class Player implements slather.sim.Player {
     }
 
     private Move getExplorerMove(Cell player_cell, byte memory, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
-        ArrayList<GridObject> nearby_obstacles = getNearbyObstacles(player_cell, nearby_cells, nearby_pheromes);
+        ArrayList<GridObject> nearby_obstacles = getNearbyObstaclesEscapeSelf(player_cell, nearby_cells, nearby_pheromes);
         if (nearby_obstacles.size() > 0) {
             // Move in the direction of the largest free angle
             if (nearby_obstacles.size() == 1) {
                 int angle = getAngleFrom(player_cell, nearby_obstacles.get(0));
                 int target_angle = angle + (180 / ANGLE_INCREMENTS);
+                if (target_angle > (360 / ANGLE_INCREMENTS)) {
+                    target_angle -= 360 / ANGLE_INCREMENTS;
+                }
+
+                for (double scale = 1.0; scale > SCALE_THRESHOLD; scale -= 0.1) {
+                    Point vector = extractVectorFromAngle(target_angle, scale);
+                    if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)) {
+                        return new Move(vector, packByteExplorer(target_angle));
+                    }
+                }
+            } else {
+                int target_angle = getLargestFreeAngle(player_cell, nearby_obstacles);
+                for (double scale = 1.0; scale > SCALE_THRESHOLD; scale -= 0.1) {
+                    Point vector = extractVectorFromAngle(target_angle, scale);
+                    if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)) {
+                        return new Move(vector, packByteExplorer(target_angle));
+                    }
+                }
+            }
+        } else {
+            // Move in the same direction
+            Point previous_direction = extractVectorFromAngle(unpackAngleExplorer(memory), 1.0);
+            if (!collides(player_cell, previous_direction, nearby_cells, nearby_pheromes)) {
+                return new Move(previous_direction, memory);
+            }
+        }
+
+		nearby_obstacles = getNearbyObstacles(player_cell, nearby_cells, nearby_pheromes);
+		if (nearby_obstacles.size() > 0) {
+			// Move in the direction of the largest free angle
+			if (nearby_obstacles.size() == 1) {
+				int angle = getAngleFrom(player_cell, nearby_obstacles.get(0));
+				int target_angle = angle + (180 / ANGLE_INCREMENTS);
                 if (target_angle > (360 / ANGLE_INCREMENTS)) {
                     target_angle -= 360 / ANGLE_INCREMENTS;
                 }
@@ -216,8 +292,8 @@ public class Player implements slather.sim.Player {
 	// convert an angle (in ANGLE_INCREMENTS increments) to a vector with magnitude Cell.move_dist (max allowed movement distance)
 	private Point extractVectorFromAngle(int arg, double scale) {
 		double theta = Math.toRadians(ANGLE_INCREMENTS * (double)arg);
-		double dx = Cell.move_dist * Math.cos(theta);
-		double dy = Cell.move_dist * Math.sin(theta);
+		double dx = Cell.move_dist * Math.cos(theta) * scale;
+		double dy = Cell.move_dist * Math.sin(theta) * scale;
 		return new Point(dx, dy);
 	}
 

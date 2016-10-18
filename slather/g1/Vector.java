@@ -9,9 +9,19 @@ public class Vector {
 
     private double x, y;
 
+    public Vector() {
+        this.x = 0;
+        this.y = 0;
+    }
+
     public Vector(double x, double y) {
         this.x = x;
         this.y = y;
+    }
+
+    public Vector(Point p) {
+        this.x = p.x;
+        this.y = p.y;
     }
 
     public Vector(double x1, double y1, double x2, double y2) {
@@ -22,6 +32,12 @@ public class Vector {
     public Vector(Point p1, Point p2) {
         this.x = p1.x - p2.x;
         this.y = p1.y - p2.y;
+    }
+
+    public Vector normalize() {
+        double length = this.length();
+        if(length == 0) return new Vector();
+        return new Vector(this.x/length, this.y/length);
     }
 
     public Vector invert() {

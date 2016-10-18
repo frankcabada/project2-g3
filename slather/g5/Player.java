@@ -13,11 +13,12 @@ public class Player implements slather.sim.Player {
     private static final double THRESHOLD_DISTANCE = 3;
 
 	private Random gen;
-
+    public AggresivePlayer aggresivePlayer;
     int t_;
     double d_;
 
     public void init(double d, int t, int side_length) {
+        aggresivePlayer = new AggresivePlayer();
         gen = new Random();
         t_ = t;
         d_ = d;
@@ -110,7 +111,26 @@ public class Player implements slather.sim.Player {
     	if(angle < 0) angle += 2*Math.PI;
     	return angle;
     }
-    private Point pathBetweenTangents(Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
+    private Point getLargestTraversableDistance(
+    		Point direction,
+    		Cell player_cell,
+    		Set<Cell> nearby_cells,
+    		Set<Pherome> nearby_pheromes) {
+    	direction = getUnitVector(direction);
+    	double small = 0;
+    	double large = 1;
+    	while(large - small > 0.001) {
+    		double mid = (small + large) / 2;
+    		Point vector = new Point(direction.x * mid, direction.y * mid);
+    		boolean can_move = !collides(player_cell, vector, nearby_cells, nearby_pheromes);
+    		if(can_move) small = mid;
+    		else large = mid;
+    	}
+    	return new Point(direction.x * small, direction.y * small);
+    }
+
+    private Point pathBetweenTangents(
+    		Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes, boolean is_late_game) {
 
     	class GridObjectAnglePair{
             GridObject gridObject;
@@ -187,7 +207,10 @@ public class Player implements slather.sim.Player {
                 	}
                 //no overlap
                 } else {
-                	if(widest < angle) {
+                	boolean both_friends = nearby_list.get(k).gridObject.player == player_cell.player 
+                			&& nearby_list.get(prev_i).gridObject.player == player_cell.player;
+                	if(widest < angle 
+                			&& (!is_late_game || !both_friends)) {
                 		widest = angle;
                 		widest_vector = prev_tangent;
                 	}
@@ -212,6 +235,8 @@ public class Player implements slather.sim.Player {
         }
         return new Point(0,0);
     }
+    
+    
     /*
      * Angle in Radian
      */
@@ -225,104 +250,149 @@ public class Player implements slather.sim.Player {
 	}
     
     public Move play(Cell player_cell, byte memory, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
-        // reproduce whenever possible
-        if (player_cell.getDiameter() >= 2) {
-            return new Move(true, (byte)0, (byte)0);
-        }
+        // Extract info from memory
+        MemByte curByte = new MemByte(memory);
+        int cur_gen = curByte.getGeneration();
+        byte cur_direction = curByte.getDirection();
 
-        Point nextPath = pathBetweenTangents(player_cell, nearby_cells, nearby_pheromes);
+        //restrict to d_restrict mm sight
+        double d_restrict = 2.0;
+        d_restrict = Math.min(d_restrict,d_);
+        Set<Cell> nearby_cells_restricted = new HashSet<Cell>();
+        Set<Pherome> nearby_pheromes_restricted = new HashSet<Pherome>();
 
-        if(nextPath.x != 0 && nextPath.y != 0) {
-            if(!collides(player_cell, nextPath, nearby_cells, nearby_pheromes)) {
-                return new Move(nextPath, (byte)(int)((Math.toDegrees(Math.atan2(nextPath.y, nextPath.x))/2)));
+        // Populate our data structures with only the pheromes and cells within the restricted distance.
+        int enemy_cells = 0;
+        for (Cell near_cell :nearby_cells ) {
+            if (player_cell.distance(near_cell) <= d_restrict ) {
+                nearby_cells_restricted.add(near_cell);
+                if (near_cell.player != player_cell.player)
+                    enemy_cells++;
             }
-        } else {
-            // continue moving in the same direction as before
-            Point vector = extractVectorFromAngle( (int)memory);
-            // check for collisions
-            if (!collides( player_cell, vector, nearby_cells, nearby_pheromes))
-            return new Move(vector, memory);
         }
-        
-        // Offensive strategy
-        /*if(memory > 0) {
-            int cellX = 0;
-            int cellY = 0;
+        int enemy_pheromes = 0;
+        for (Pherome near_pherome : nearby_pheromes ) {
+            if (player_cell.distance(near_pherome) <= d_restrict ) {
+                nearby_pheromes_restricted.add(near_pherome);
+                if (near_pherome.player != player_cell.player)
+                    enemy_pheromes++;
+            } 
+        }
 
-            // Look at nearby cells and go toward opposing players 
-            // and away from friendly cells
+        // Reproduce whenever possible
+        if (player_cell.getDiameter() >= 2) {
+            System.out.println("Next generation: " + (curByte.getGeneration() + 1));
+            return new Move(true, curByte.nextGeneration(), curByte.nextGeneration());
+
+        }
+
+        // HEURISTICS TO VARY TO TEST
+        int RANDOM_RANGE = 10;
+        int GEN_TO_START_STRAT = 8;
+        double MAX_PACKING_DIAMETER = 1.2;
+
+        // Packer strategy if we're in an old enough generation.
+        Random random = new Random();
+        if((cur_gen == 15 && player_cell.getDiameter() <= MAX_PACKING_DIAMETER) || (cur_gen > GEN_TO_START_STRAT && random.nextInt(RANDOM_RANGE) == 0 && player_cell.getDiameter() <= MAX_PACKING_DIAMETER)) {
+            curByte = curByte.packerByte();
+            double cellX = 0;
+            double cellY = 0;
+
+            // Look at nearby cells and go toward friendly cells
+            Cell closest_cell = null;
+            double min_distance = 1000.0;
             for (Cell c : nearby_cells) {
 
                 int counter = 0;
                 int friendly_counter = 0;
-                final int THRESHOLD = 6;
 
                 double distance = player_cell.distance(c);
 
                 if(c.player != player_cell.player) {
                     counter++;
-
-                    // TODO: If we're being encroached, perhaps the strategy should
-                    //       be shifted so we move away from all cells until we're less encroached.
-
-                    
-                    if(player_cell.getDiameter() >= 1.9) {
-                        cellX -= (c.getPosition().x - player_cell.getPosition().x)*distance;
-                        cellY -= (c.getPosition().y - player_cell.getPosition().y)*distance;
-                    } else if (counter > THRESHOLD) {
-                        cellX += (c.getPosition().x - player_cell.getPosition().x)*distance;
-                        cellY += (c.getPosition().y - player_cell.getPosition().y)*distance;
-                    } else {
-                        cellX -= (c.getPosition().x - player_cell.getPosition().x)*distance;
-                        cellY -= (c.getPosition().y - player_cell.getPosition().y)*distance;
-                    }
-                    // TODO: Weight the contribution by distance to cell
-                    //       This could help, probably for large d? maybe not?
-                    // TODO: Perhaps look at pheromes too and move away from friendly 
-                    // ones so as to explore unexplored territory 
-
-
-                } else {
+                } else if(c.getDiameter() <= MAX_PACKING_DIAMETER) {
                     friendly_counter++;
+                    if(distance < min_distance) {
+                        closest_cell = c;
+                        min_distance = distance;
+                    }
 
-                    //if(friendly_counter < 5) {
-                    //    cellX += c.getPosition().x - player_cell.getPosition().x;
-                    //    cellY += c.getPosition().y - player_cell.getPosition().y;                        
-                    //} else {
-                    cellX -= (c.getPosition().x - player_cell.getPosition().x)*distance;
-                    cellY -= (c.getPosition().y - player_cell.getPosition().y)*distance;
-                    //}
+                    cellX -= (c.getPosition().x - player_cell.getPosition().x);
+                    cellY -= (c.getPosition().y - player_cell.getPosition().y);
                 }
+            }
+
+            if(min_distance < 0.001) {
+                return new Move(new Point(1, 0), curByte.getRawByte());
+            }
+
+            if(closest_cell != null) {
+                cellX = -(closest_cell.getPosition().x - player_cell.getPosition().x);
+                cellY = -(closest_cell.getPosition().y - player_cell.getPosition().y);
             }
 
             if(Math.hypot(cellX, cellY) == 0) { // If there are no nearby cells or the desired destination is to stay put
                 // continue moving in the same direction as before
-                Point vector = extractVectorFromAngle( (int)memory);
+                Point vector = extractVectorFromAngle(curByte.getDirection());
                 // check for collisions
-                if (!collides( player_cell, vector, nearby_cells, nearby_pheromes))
-                return new Move(vector, memory);
+                if (!collides( player_cell, vector, nearby_cells_restricted, nearby_pheromes_restricted))
+                return new Move(vector, curByte.getRawByte());
             } else {
-                // otherwise move toward enemies and away from friendlies
+                // otherwise move toward friendlies
 
                 Point newDir = new Point(cellX / Math.hypot(cellX, cellY), 
                                           cellY / Math.hypot(cellX, cellY));
 
-                if(!collides(player_cell, newDir, nearby_cells, nearby_pheromes)) {
-                    return new Move(newDir, (byte)((Math.atan2(cellY, cellX))/2));
-                }
+                byte newStoredDirection = (byte)((Math.atan2(cellY, cellX))/22);
+                return new Move(newDir, curByte.withNewDirection(newStoredDirection));
             }
-        }*/
+        }
+
+        // if (enemy_pheromes + enemy_cells > 14)
+        //     System.out.println(enemy_pheromes + enemy_cells);
+
+        Point nextPath = pathBetweenTangents(player_cell, nearby_cells_restricted, nearby_pheromes_restricted,
+        		enemy_pheromes + enemy_cells > 14);
+
+        if(nextPath.x != 0 && nextPath.y != 0) {
+            if(!collides(player_cell, nextPath, nearby_cells_restricted, nearby_pheromes_restricted)) {
+                // Convert this new direction into a 4-bit value that can persist.
+                byte newDirection = (byte)(int)((Math.toDegrees(Math.atan2(nextPath.y, nextPath.x))/22));
+                return new Move(nextPath, curByte.withNewDirection(newDirection));
+            } else {
+            	Point vector = getLargestTraversableDistance(
+    					nextPath, player_cell, nearby_cells_restricted, nearby_pheromes_restricted);
+            	//System.out.println("newlate2 norm: " + vector.norm());
+            	if(vector.norm() < 0.75 && vector.norm() > 0.25 
+            			&& !collides(player_cell, vector, nearby_cells_restricted, nearby_pheromes_restricted)) {
+            		//System.out.println("newlate2 Well done, strategy.");
+
+                    // Convert this new direction into a 4-bit value that can persist.
+                    byte newDirection = (byte)(int)((Math.toDegrees(Math.atan2(vector.y, vector.x))/22));
+            		return new Move(
+            			vector, curByte.withNewDirection(newDirection)
+                    );
+            	}
+            }
+        } else {
+            // continue moving in the same direction as before
+            Point vector = extractVectorFromAngle( curByte.getDirection());
+            // check for collisions
+            if (!collides( player_cell, vector, nearby_cells_restricted, nearby_pheromes_restricted))
+            return new Move(vector, curByte.getRawByte());
+        }
 
         // Generate a random new direction to travel
         for (int i=0; i<4; i++) {
-            int arg = gen.nextInt(180)+1;
+            int arg = gen.nextInt(16)+1;
             Point vector = extractVectorFromAngle(arg);
-            if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)) 
-            return new Move(vector, (byte) arg);
+            if (!collides(player_cell, vector, nearby_cells_restricted, nearby_pheromes_restricted))  {
+                return new Move(vector, curByte.withNewDirection((byte)arg));
+            }
         }
 
         // if all tries fail, just chill in place
-        return new Move(new Point(0,0), (byte)0);
+        return new Move(new Point(0,0), curByte.getRawByte());
     }
     
     
@@ -350,7 +420,7 @@ public class Player implements slather.sim.Player {
     	return out;
     }
     
-    // Broken nextDirection function for circle strategy
+    // Unused strategy for circling
     private Point nextDirection(Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
 
         Pherome closest_to_one_mm = null;
@@ -406,12 +476,12 @@ public class Player implements slather.sim.Player {
     return false;
     }
 
-    // convert an angle (in 2-deg increments) to a vector with magnitude Cell.move_dist (max allowed movement distance)
+    // convert an angle (in 22.5-deg increments) to a vector with magnitude Cell.move_dist (max allowed movement distance)
     private Point extractVectorFromAngle(int arg) {
-    double theta = Math.toRadians( 2* (double)arg );
-    double dx = Cell.move_dist * Math.cos(theta);
-    double dy = Cell.move_dist * Math.sin(theta);
-    return new Point(dx, dy);
+        double theta = Math.toRadians( 22.5 * (double)arg );
+        double dx = Cell.move_dist * Math.cos(theta);
+        double dy = Cell.move_dist * Math.sin(theta);
+        return new Point(dx, dy);
     }
     private double getDistanceDirect(Point first, Point second) {
 		double dist_square = (first.x - second.x)*(first.x - second.x) + (first.y - second.y)*(first.y - second.y);
