@@ -1,5 +1,6 @@
 package slather.g3;
 
+import slather.sim.GridObject;
 import slather.sim.Cell;
 import slather.sim.Point;
 import slather.sim.Move;
@@ -12,7 +13,7 @@ public class Player implements slather.sim.Player {
     private double d;
     private int t;
     private int side_length;
-    private final int CLOSE_RANGE_VISION = 5;
+    private final int CLOSE_RANGE = 5;
     private final int ANGLE_PRECISION = 2;
 
     public void init(double d, int t, int side_length) {
@@ -33,17 +34,18 @@ public class Player implements slather.sim.Player {
 			
 			byte memory1 = memory;
 			int angle2 = memoryToAngleInt(memory);
-			angle2 = (angle2 + 180)%360; //Angle should be opposite 
+			angle2 = (angle2 + 180)%360; //Angle should be opposite
 			byte memory2 =  angleToByte(angle2);
 			
 			return new Move(true, memory1, memory2);
 		}
 
-		ArrayList<Integer> cellAngleList = generateAngleListOfNearbyCells(player_cell,nearby_cells, false);
-		ArrayList<Integer> pheromeAngleList = generateAngleListOfNearbyPheromes(player_cell,nearby_pheromes, true);
-		ArrayList<Integer> angleList = new ArrayList<Integer>();
-		angleList.addAll(cellAngleList);
-		angleList.addAll(pheromeAngleList);
+		//ArrayList<Integer> cellAngleList = generateAngleListOfNearbyCells(player_cell,nearby_cells, false);
+		//ArrayList<Integer> pheromeAngleList = generateAngleListOfNearbyPheromes(player_cell,nearby_pheromes, true);
+		//ArrayList<Integer> angleList = new ArrayList<Integer>();
+		//angleList.addAll(cellAngleList);
+		//angleList.addAll(pheromeAngleList);
+		ArrayList<Integer> angleList = generateAngleList(player_cell, nearby_cells, nearby_pheromes);
 		Collections.sort(angleList);
 //			System.out.println(angleList);
 		
@@ -148,7 +150,7 @@ public class Player implements slather.sim.Player {
     private Set<Cell> closeRangeCells(Cell source_cell, Set<Cell> all_cells) {
     	Set<Cell> closest_cells = new HashSet<Cell>();
 		for (Cell other_cell : all_cells) {
-			if (source_cell.distance(other_cell) < CLOSE_RANGE_VISION) {
+			if (source_cell.distance(other_cell) < CLOSE_RANGE ) {
 				closest_cells.add(other_cell);
 			}
 		}
@@ -319,7 +321,7 @@ public class Player implements slather.sim.Player {
 			if(ignoreSamePlayer && (c.player == player_cell.player)) { //Ignore your own pheromes
 				continue;
 			}
-			if(player_cell.distance(c) > CLOSE_RANGE_VISION) {
+			if(player_cell.distance(c) > CLOSE_RANGE ) {
 				continue;
 			}
 			double cX = c.getPosition().x;
@@ -366,5 +368,64 @@ public class Player implements slather.sim.Player {
 		}
 		Collections.sort(angleList);
 		return angleList;
+	}
+
+	private ArrayList<Integer> generateAngleList(Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
+		ArrayList<GridObject> nearby_objects = getNearbyFriendsOrAll(player_cell, nearby_cells, nearby_pheromes);
+		ArrayList<Integer> angleList = new ArrayList<Integer>();
+		
+		for(GridObject object : nearby_objects) {
+			double pX = object.getPosition().x;
+			double pY = object.getPosition().y;
+			double tX = player_cell.getPosition().x;
+			double tY = player_cell.getPosition().y;
+			double dX = pX-tX;
+			double dY = pY-tY;
+			double angle = Math.atan(dY/dX);
+			
+			if(dX>=0 && dY>=0); //Do nothing
+			if(dX>=0 && dY<0) angle += 2*Math.PI;
+			if(dX<0 && dY>=0) angle = Math.PI - angle;
+			if(dX<0 && dY<0) angle = Math.PI - angle;
+			
+//			System.out.println(player_cell.hashCode() + "\t" + dY/dX);
+//			System.out.println(Math.toDegrees(angle));
+			angleList.add((int)Math.toDegrees(angle));
+		}
+		Collections.sort(angleList);
+		return angleList;
+	}
+
+	private ArrayList<GridObject> getNearbyFriendsOrAll(Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
+		// Inspired by g9
+		ArrayList<GridObject> allObjects = new ArrayList<GridObject>();
+		ArrayList<GridObject> friends = new ArrayList<GridObject>();
+		ArrayList<GridObject> enemies = new ArrayList<GridObject>();
+		double range = CLOSE_RANGE * player_cell.getDiameter();
+
+		for (Cell cell: nearby_cells) {
+			// Multiply CLOSE_RANGE * diameter to only consider objects within X number of moves
+			if (player_cell.distance(cell) > range) {
+				continue;
+			}
+			if (cell.player == player_cell.player) {
+				friends.add(cell);
+			}
+			else {
+				enemies.add(cell);
+			}
+			allObjects.add(cell);
+		}
+		for (Pherome pherome: nearby_pheromes) {
+			// Ignore same pheromes and pheromes outside of our desired threshold
+			if (pherome.player == player_cell.player || player_cell.distance(pherome) > range) {
+				continue;
+			}
+			allObjects.add(pherome);
+		}
+		if (friends.size() > enemies.size()) {
+			return friends;
+		}
+		return allObjects;
 	}
 }
