@@ -37,7 +37,7 @@ public class Player implements slather.sim.Player {
 
 		Move finalMove = nearby_cells.size() > 0 ?getVectorBasedMove(player_cell, nearby_cells, nearby_pheromes) : hexagonMethod(player_cell, (int)memory);
 
-		System.out.println(finalMove.vector.x + " " + finalMove.vector.y);
+//		System.out.println(finalMove.vector.x + " " + finalMove.vector.y);
 
 		return finalMove;
 	}

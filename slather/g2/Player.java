@@ -42,7 +42,7 @@ public class Player implements slather.sim.Player {
     // Do not make recursive calls to this init.
 
     private Player getPlayerInstance(String className) {
-        System.out.println(className);
+        //System.out.println(className);
         if(className.equals("Scout")) {
             return new Scout();
         } else if(className.equals("GridCircler")) {
@@ -57,7 +57,7 @@ public class Player implements slather.sim.Player {
     }
 
     public void init(double d, int t, int side_length) {
-        System.out.println("Player init");
+        //System.out.println("Player init");
 
         this.RANDOM_GENERATOR = new Random(System.currentTimeMillis());
         this.VISION = d;

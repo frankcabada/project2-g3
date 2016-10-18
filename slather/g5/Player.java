@@ -281,7 +281,7 @@ public class Player implements slather.sim.Player {
 
         // Reproduce whenever possible
         if (player_cell.getDiameter() >= 2) {
-            System.out.println("Next generation: " + (curByte.getGeneration() + 1));
+            //System.out.println("Next generation: " + (curByte.getGeneration() + 1));
             return new Move(true, curByte.nextGeneration(), curByte.nextGeneration());
 
         }

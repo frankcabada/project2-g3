@@ -382,17 +382,7 @@ public class Player implements slather.sim.Player {
 			double dX = pX-tX;
 			double dY = pY-tY;
 			int angle = (int)Math.toDegrees(Math.atan2(dY,dX));
-			if (angle < 0) {
-				angle += 360;
-			}
-			/*
-			if(dX>=0 && dY>=0); //Do nothing
-			if(dX>=0 && dY<0) angle += 2*Math.PI;
-			if(dX<0 && dY>=0) angle = Math.PI - angle;
-			if(dX<0 && dY<0) angle = Math.PI - angle;
-			*/
-//			System.out.println(player_cell.hashCode() + "\t" + dY/dX);
-//			System.out.println(Math.toDegrees(angle));
+			angle = (angle+360)%360; // ensure angle is positive
 			angleList.add(angle);
 		}
 		Collections.sort(angleList);

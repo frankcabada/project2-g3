@@ -89,7 +89,7 @@ public class Player implements slather.sim.Player {
             byte inOrOut = (byte) (memory & 0b00000001);
             // if on OUTWARD movement, if cant move, revert to scout
             if (!nextReproduce && nextVector.x == 0 && nextVector.y == 0 && inOrOut == 0) {
-                System.out.println("REVERT TO SCOUT");
+               // System.out.println("REVERT TO SCOUT");
                 memory = (byte) 0b01000001;
                 nextMove = scout(player_cell, memory, nearby_cells, nearby_pheromes);
                 byte newMemory = nextMove.memory;
@@ -550,10 +550,10 @@ public class Player implements slather.sim.Player {
             double theta = Math.toRadians(angleMove);
             double dx = Cell.move_dist * Math.cos(theta);
             double dy = Cell.move_dist * Math.sin(theta);
-            System.out.println("Deg away from center: " + degAwayCenter);
-            System.out.println("Neighbor angles: " + neighborAngles.toString());
-            System.out.println("largest arc: " + maxArc + ", (" + arcStart + ", " + arcEnd);
-            System.out.println("Move to: " + angleMove%360);
+            //System.out.println("Deg away from center: " + degAwayCenter);
+            //System.out.println("Neighbor angles: " + neighborAngles.toString());
+            //System.out.println("largest arc: " + maxArc + ", (" + arcStart + ", " + arcEnd);
+            //System.out.println("Move to: " + angleMove%360);
 
             nextVector = new Point(dx, dy);
             int tries = 0;
@@ -588,7 +588,7 @@ public class Player implements slather.sim.Player {
         int strat = getStrategy(nextMemory);
         String s = String.format("%8s", Integer.toBinaryString(memory & 0xFF)).replace(' ','0');
         if (strat != 3) {
-            System.out.println("New memory set to: " + s);
+            //System.out.println("New memory set to: " + s);
         }
         return nextMove;
     }
@@ -753,7 +753,7 @@ public class Player implements slather.sim.Player {
         if (count > 1) { // more than one close pherome, vector cannot be determined
             dX = MAX_MOVEMENT + 1;
             dY = MAX_MOVEMENT + 1;
-            System.out.println("Found too many pheromes: " + count);
+            //System.out.println("Found too many pheromes: " + count);
             return new Point(dX, dY);
         }
         else if (count == 0) { // no pheromes deteced closeby
