@@ -85,12 +85,15 @@ public class Player implements slather.sim.Player {
 				}
 			}
 			for(int j=0; j<possibleAngles.size(); j++){
+
 				int best_angle = possibleAngles.get(j);
-				Point vector = extractVectorFromAngle(best_angle);
-				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
-					memory = angleToByte(best_angle); // keep within 8 bits
-					return new Move(vector, memory);
-				}
+				for (float k=1; k>0; k-=.1){
+					Point vector = extractVectorFromAngleWithScalar(best_angle, k);
+					if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+						memory = angleToByte(best_angle); //// keep within 8 bits
+						return new Move(vector, memory);
+					}
+				}	
 			}
 		}	
 	
@@ -144,7 +147,7 @@ public class Player implements slather.sim.Player {
 		double theta = Math.toRadians(1 * (double) arg); //We need bigger circles!
 		double dx = Cell.move_dist * Math.cos(theta);
 		double dy = Cell.move_dist * Math.sin(theta);
-		return new Point(dx, dy);
+		return new Point(dx, dy); 
 	}
 	
     private Set<Cell> closeRangeCells(Cell source_cell, Set<Cell> all_cells) {
