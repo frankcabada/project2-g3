@@ -85,9 +85,9 @@ public class Player implements slather.sim.Player {
 				}
 			}
 			for(int j=0; j<possibleAngles.size(); j++){
-
 				int best_angle = possibleAngles.get(j);
-				for (float k=1; k>0; k-=.1){
+				//int best_angle = possibleAngles.get(0);
+				for (float k=1; k>0; k-=0.1){
 					Point vector = extractVectorFromAngleWithScalar(best_angle, k);
 					if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
 						memory = angleToByte(best_angle); //// keep within 8 bits
@@ -193,7 +193,7 @@ public class Player implements slather.sim.Player {
 	
 
 	private Point extractVectorFromAngleWithScalar(int arg, float f) {
-		double theta = Math.toRadians(1 * (double) arg); //We need bigger circles!
+		double theta = Math.toRadians((double) arg); //We need bigger circles!
 		double dx = f*Cell.move_dist * Math.cos(theta);
 		double dy = f*Cell.move_dist * Math.sin(theta);
 		return new Point(dx, dy);
@@ -282,12 +282,9 @@ public class Player implements slather.sim.Player {
 			double tY = player_cell.getPosition().y;
 			double dX = cX-tX;
 			double dY = cY-tY;
-			double angle = Math.atan(dY/dX);
-			if(dX>=0 && dY>=0); //Do nothing
-			if(dX>=0 && dY<0) angle += 2*Math.PI;
-			if(dX<0 && dY>=0) angle += Math.PI;
-			if(dX<0 && dY<0) angle += Math.PI;
-			angleToCellMap.put((int)Math.toDegrees(angle), c);
+			int angle = (int)Math.toDegrees(Math.atan2(dY,dX));
+			angle = (angle+360)%360; // ensure angle is positive
+			angleToCellMap.put(angle, c);
 		}
 		return angleToCellMap;
 	}
@@ -308,12 +305,9 @@ public class Player implements slather.sim.Player {
 			double tY = player_cell.getPosition().y;
 			double dX = cX-tX;
 			double dY = cY-tY;
-			double angle = Math.atan(dY/dX);
-			if(dX>=0 && dY>=0); //Do nothing
-			if(dX>=0 && dY<0) angle += 2*Math.PI;
-			if(dX<0 && dY>=0) angle = Math.PI - angle;
-			if(dX<0 && dY<0) angle = Math.PI - angle;
-			angleToPheromeMap.put((int)Math.toDegrees(angle), p);
+			int angle = (int)Math.toDegrees(Math.atan2(dY,dX));
+			angle = (angle+360)%360; // ensure angle is positive
+			angleToPheromeMap.put(angle, p);
 		}
 		return angleToPheromeMap;
 	}
@@ -333,15 +327,9 @@ public class Player implements slather.sim.Player {
 			double tY = player_cell.getPosition().y;
 			double dX = cX-tX;
 			double dY = cY-tY;
-			double angle = Math.atan(dY/dX);
-			
-			if(dX>=0 && dY>=0); //Do nothing
-			if(dX>=0 && dY<0) angle += 2*Math.PI;
-			if(dX<0 && dY>=0) angle = Math.PI - angle;
-			if(dX<0 && dY<0) angle = Math.PI - angle;
-//			System.out.println(player_cell.hashCode() + "\t" + dY/dX);
-//			System.out.println(Math.toDegrees(angle));
-			angleList.add((int)Math.toDegrees(angle));
+			int angle = (int)Math.toDegrees(Math.atan2(dY,dX));
+			angle = (angle+360)%360; // ensure angle is positive
+			angleList.add(angle);
 		}
 		Collections.sort(angleList);
 		return angleList;
@@ -358,16 +346,9 @@ public class Player implements slather.sim.Player {
 			double tY = player_cell.getPosition().y;
 			double dX = pX-tX;
 			double dY = pY-tY;
-			double angle = Math.atan(dY/dX);
-			
-			if(dX>=0 && dY>=0); //Do nothing
-			if(dX>=0 && dY<0) angle += 2*Math.PI;
-			if(dX<0 && dY>=0) angle = Math.PI - angle;
-			if(dX<0 && dY<0) angle = Math.PI - angle;
-			
-//			System.out.println(player_cell.hashCode() + "\t" + dY/dX);
-//			System.out.println(Math.toDegrees(angle));
-			angleList.add((int)Math.toDegrees(angle));
+			int angle = (int)Math.toDegrees(Math.atan2(dY,dX));
+			angle = (angle+360)%360; // ensure angle is positive
+			angleList.add(angle);
 		}
 		Collections.sort(angleList);
 		return angleList;
@@ -419,7 +400,7 @@ public class Player implements slather.sim.Player {
 			}
 			allObjects.add(pherome);
 		}
-		if (friends.size() > enemies.size()) {
+		if (friends.size() * 1.75 > enemies.size()) {
 			return friends;
 		}
 		return allObjects;
