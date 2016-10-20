@@ -107,7 +107,7 @@ public class ClusterStrategy implements Strategy {
 
 		double theta = start + step;
 		System.out.println("Current direction is " + start + ", going towards " + theta);
-		return ToolBox.newDirection(myCell.getPosition(), theta);
+		return ToolBox.newDirection(theta);
 	}
 
 	@Override
@@ -284,7 +284,7 @@ public class ClusterStrategy implements Strategy {
 		/* Todo: What if the largest gap is 0? Very unlikely */
 
 		/* Generate the point to go */
-		return ToolBox.newDirection(myPoint, toGo);
+		return ToolBox.newDirection(toGo);
 	}
 
 	public static boolean collides(Cell player_cell, Point vector, Set<Cell> nearby_cells,

@@ -22,9 +22,11 @@ public class Player implements slather.sim.Player {
 	private int movesPerSide;
 	private int totalOfSides;
 	private MaxAnglePlayer maxAnglePlayer = new MaxAnglePlayer();
-	private MaxAnglePlayerTemp maxAnglePlayerTemp = new MaxAnglePlayerTemp();
+	private MaxAnglePlayerLazy maxAnglePlayerLazy = new MaxAnglePlayerLazy();
+	private MaxAnglePlayerExpand maxAnglePlayerExpand = new MaxAnglePlayerExpand();
+	//private MaxAnglePlayerTemp maxAnglePlayerTemp = new MaxAnglePlayerTemp();
 
-	public void init(double d, int t, int sideLength) {
+	public void init(double d, int t, int side_length) {
 		gen = new Random();
 		this.d = d;
 		this.t = t;
@@ -36,8 +38,10 @@ public class Player implements slather.sim.Player {
 		this.movesPerSide = t / 4;	// 4 for the # of sides in a square
 		this.totalOfSides = movesPerSide * 4;
 		this.squaring = true;
-		maxAnglePlayer.init(d, t, sideLength);
-		maxAnglePlayerTemp.init(d, t, sideLength);
+		maxAnglePlayer.init(d, t, side_length);
+		maxAnglePlayerLazy.init(d, t, side_length);
+		maxAnglePlayerExpand.init(d, t, side_length);
+		//maxAnglePlayerTemp.init(d, t, sideLength);
 	}
 
 	public Move play(Cell player_cell, byte memory, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
@@ -45,11 +49,12 @@ public class Player implements slather.sim.Player {
 		/* records heirarchical reproduction count in memory */
 		
 		//uncomment to use max angle player
-		if(this.d>2){
-			return maxAnglePlayer.play(player_cell, memory, nearby_cells, nearby_pheromes);
-		}else{
-			return maxAnglePlayerTemp.play(player_cell, memory, nearby_cells, nearby_pheromes);
-		}
+		return maxAnglePlayerExpand.play(player_cell, memory, nearby_cells, nearby_pheromes);
+		//if(this.d>2) return maxAnglePlayer.play(player_cell, memory, nearby_cells, nearby_pheromes);
+		//else return maxAnglePlayerLazy.play(player_cell, memory, nearby_cells, nearby_pheromes);
+//		}else{
+//			return maxAnglePlayerTemp.play(player_cell, memory, nearby_cells, nearby_pheromes);
+//		}
 		
 		/*if (turn == 0) {
 			this.diameter = player_cell.getDiameter();

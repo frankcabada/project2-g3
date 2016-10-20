@@ -22,6 +22,9 @@ public class Player implements slather.sim.Player {
     private static int ANGLE_INCREMENTS = 3;
     private static double SCALE_THRESHOLD = 0.1;
 
+	private static double ratio = 1.0;
+	private static double sight = 3;
+
     class ScoredObject implements Comparable<ScoredObject> {
         public GridObject object;
         public int angle;
@@ -70,7 +73,7 @@ public class Player implements slather.sim.Player {
         ArrayList<GridObject> nearby_different = new ArrayList<GridObject>();
 
         for (Cell cell : nearby_cells) {
-            if (player_cell.getPosition().distance(cell.getPosition()) < 5 * player_cell.getDiameter()){
+            if (player_cell.getPosition().distance(cell.getPosition()) < sight * player_cell.getDiameter()){
                 if(cell.player == player_cell.player){
                     nearby_same.add(cell);
                 }else{
@@ -81,12 +84,12 @@ public class Player implements slather.sim.Player {
         }
 
 		for (Pherome pherome : nearby_pheromes) {
-			if (player_cell.getPosition().distance(pherome.getPosition()) < 5 * player_cell.getDiameter()) {
+			if (player_cell.getPosition().distance(pherome.getPosition()) < sight * player_cell.getDiameter()) {
 				nearby_obstacles.add(pherome);
             }
 		}
 
-        if(nearby_same.size() * 1.5 > nearby_different.size()){
+        if(nearby_same.size() * ratio > nearby_different.size()){
             return nearby_same;
         }
 
@@ -99,7 +102,7 @@ public class Player implements slather.sim.Player {
         ArrayList<GridObject> nearby_different = new ArrayList<GridObject>();
 
 		for (Cell cell : nearby_cells) {
-			if (player_cell.getPosition().distance(cell.getPosition()) < 5 * player_cell.getDiameter()){
+			if (player_cell.getPosition().distance(cell.getPosition()) < sight * player_cell.getDiameter()){
                 if(cell.player == player_cell.player){
                     nearby_same.add(cell);
                 }else{
@@ -110,12 +113,12 @@ public class Player implements slather.sim.Player {
         }
 
 		for (Pherome pherome : nearby_pheromes) {
-			if (player_cell.getPosition().distance(pherome.getPosition()) < 2 * player_cell.getDiameter()  && pherome.player != player_cell.player) {
+			if (player_cell.getPosition().distance(pherome.getPosition()) < sight * player_cell.getDiameter()  && pherome.player != player_cell.player) {
                 nearby_obstacles.add(pherome);
             }
 		}
 
-        if(nearby_same.size() * 1.5 > nearby_different.size()){
+        if(nearby_same.size() * ratio > nearby_different.size()){
             return nearby_same;
         }
 
@@ -123,6 +126,13 @@ public class Player implements slather.sim.Player {
 	}
 
     private Move getDefaultMove(Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
+		/*
+		if (player_cell.getDiameter() < 1.2) {
+			int coin = gen.nextInt(2);
+			if (coin == 0) return new Move(new Point(0, 0), (byte)0);
+		}
+		*/
+
         // if no previous direction specified or if there was a collision, try random directions to go in until one doesn't collide
         for (double scale = 1.0; scale > SCALE_THRESHOLD; scale -= 0.1) {
             int angle = gen.nextInt(360 / ANGLE_INCREMENTS) + 1;

@@ -2,8 +2,10 @@ package slather.g7;
 
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.TreeMap;
 
 import slather.sim.Cell;
 import slather.sim.GridObject;
@@ -18,6 +20,7 @@ public class ToolBox {
 	public static double diameterBeforeReproduction = 1.92;
 	public static double friendsAngleThreshold = Math.PI / 3;
 	public static double enemiesAngleThreshold = Math.PI / 3;
+	public static int cellThreshold = 3;
 
 	/*
 	 * Due to wrap around, the difference between two points in coordinate x and
@@ -39,7 +42,7 @@ public class ToolBox {
 
 	/* Return an angle between 0~2PI */
 	public static double getCosine(Point myPoint, Point otherPoint) {
-		Point diffPoint=pointDistance(myPoint,otherPoint);
+		Point diffPoint = pointDistance(myPoint, otherPoint);
 		double diffX = diffPoint.x;
 		double diffY = diffPoint.y;
 		double diffDist = Math.sqrt(diffX * diffX + diffY * diffY);
@@ -50,25 +53,25 @@ public class ToolBox {
 		// double angle=Math.acos(diffY/diffDist);
 		double angle = Math.asin(diffY / diffDist);
 		double targetY;
-		if(Math.abs(otherPoint.y-myPoint.y)<50)
-			targetY=otherPoint.y;
-		else{
-			if(otherPoint.y>myPoint.y)
-				targetY=otherPoint.y-100;
+		if (Math.abs(otherPoint.y - myPoint.y) < 50)
+			targetY = otherPoint.y;
+		else {
+			if (otherPoint.y > myPoint.y)
+				targetY = otherPoint.y - 100;
 			else
-				targetY=otherPoint.y+100;
+				targetY = otherPoint.y + 100;
 		}
 		double targetX;
-		if(Math.abs(otherPoint.x-myPoint.x)<50)
-			targetX=otherPoint.x;
-		else{
-			if(otherPoint.x>myPoint.x)
-				targetX=otherPoint.x-100;
+		if (Math.abs(otherPoint.x - myPoint.x) < 50)
+			targetX = otherPoint.x;
+		else {
+			if (otherPoint.x > myPoint.x)
+				targetX = otherPoint.x - 100;
 			else
-				targetX=otherPoint.x+100;
+				targetX = otherPoint.x + 100;
 		}
-		
-		if (targetY< myPoint.y)
+
+		if (targetY < myPoint.y)
 			if (targetX >= myPoint.x)
 				return 2 * Math.PI + angle;
 			else
@@ -92,10 +95,9 @@ public class ToolBox {
 	}
 
 	/* The distance is 1. */
-	public static Point newDirection(Point me, double theta) {
+	public static Point newDirection(double theta) {
 		double diffX = Math.cos(theta);
 		double diffY = Math.sin(theta);
-		// return new Point(me.x + diffX, me.y + diffY);
 		return new Point(diffX, diffY);
 	}
 
@@ -112,7 +114,7 @@ public class ToolBox {
 
 		Point toReturn;
 		if (hypotenuse == 0.0) {
-			toReturn = new Point(0.0, 0.0);
+			toReturn = new Point(0, 0);
 		} else {
 			offX /= hypotenuse;
 			offY /= hypotenuse;
@@ -325,15 +327,14 @@ public class ToolBox {
 			Cell other = cell_it.next();
 			Point destination = player_cell.getPosition().move(new Point(dirX, dirY));
 
-			if (destination.distance(other.getPosition()) < 0.5 * newDiameter + 0.5 * other.getDiameter()
-					+ 0.00011) {
-				newDistanceToMove = (Math.pow(dirX,2) + Math.pow(dirY,2)) - 0.01*player_cell.getDiameter();
-				
+			if (destination.distance(other.getPosition()) < 0.5 * newDiameter + 0.5 * other.getDiameter() + 0.00011) {
+				newDistanceToMove = (Math.pow(dirX, 2) + Math.pow(dirY, 2)) - 0.01 * player_cell.getDiameter();
+
 				dirX = (Math.sqrt(newDistanceToMove)) * dirX;
 				dirY = (Math.sqrt(newDistanceToMove)) * dirY;
 
 				destination = player_cell.getPosition().move(new Point(dirX, dirY));
-				System.out.println("Updating new direction due to cell to "+destination.x+", "+destination.y);
+				System.out.println("Updating new direction due to cell to " + destination.x + ", " + destination.y);
 			}
 		}
 		Iterator<Pherome> pherome_it = nearby_pheromes.iterator();
@@ -343,16 +344,100 @@ public class ToolBox {
 
 			if (other.player != player_cell.player
 					&& destination.distance(other.getPosition()) < 0.5 * newDiameter + 0.0001) {
-				newDistanceToMove = (Math.pow(dirX,2) + Math.pow(dirY,2)) - 0.01*player_cell.getDiameter();
-				
+				newDistanceToMove = (Math.pow(dirX, 2) + Math.pow(dirY, 2)) - 0.01 * player_cell.getDiameter();
+
 				dirX = (Math.sqrt(newDistanceToMove)) * dirX;
 				dirY = (Math.sqrt(newDistanceToMove)) * dirY;
 				destination = player_cell.getPosition().move(new Point(dirX, dirY));
-				System.out.println("Updating new direction to "+destination.x+", "+destination.y);
+				System.out.println("Updating new direction to " + destination.x + ", " + destination.y);
 			}
 		}
-		Point toReturn=new Point(dirX,dirY);
-		System.out.println("Final direction:"+toReturn.x+", "+toReturn.y);
+		Point toReturn = new Point(dirX, dirY);
+		System.out.println("Final direction:" + toReturn.x + ", " + toReturn.y);
 		return new Point(dirX, dirY);
+	}
+
+	// Sort the objects around the cell by distance and only return limited
+	// closest ones
+	public static Set<GridObject> limitVisionToSize(Cell me, Set<Cell> cells, Set<Pherome> pheromes,
+			boolean ignoreMyPheromones, int size) {
+		TreeMap<Double, GridObject> distMap = new TreeMap<>();// sort the things
+																// by distance
+																// incrementally
+
+		for (Cell c : cells) {
+			// If too far away, ignore
+			double dist = ToolBox.calcRawDist(me, c);
+			/*
+			 * Deduct the radius of the other cell. Effect: If the other cell is
+			 * more than 2mm away but its body will come in our way, still
+			 * consider it.
+			 */
+			dist -= c.getDiameter();
+			if(distMap.containsKey(dist))
+				dist+=0.0001;
+			distMap.put(dist, c);
+		}
+		for (Pherome p : pheromes) {
+			if (ignoreMyPheromones && p.player == me.player)
+				continue;
+			// If too far away, ignore
+			double dist = ToolBox.calcRawDist(me, p);
+			distMap.put(dist, p);
+		}
+		if (distMap.size() < size) {
+			System.out.println("Only " + distMap.size() + " cells or enemy pheromones around.");
+		}
+		Set<GridObject> kept = new HashSet<>();
+		for (Map.Entry<Double, GridObject> e : distMap.entrySet()) {
+			if (kept.size() < size) {
+				kept.add(e.getValue());
+			} else {
+				break;
+			}
+		}
+		return kept;
+
+	}
+
+	public static double distanceToClosestObject(Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
+		double closest = Double.MAX_VALUE;
+		
+		for (Cell cell : nearby_cells) {
+			double dist = player_cell.distance(cell);
+			if (dist <= 0.0001) return 0;
+			if (dist >= 0 && dist < closest) {
+				closest = dist;
+			}
+		}
+		
+		for (Pherome pherome : nearby_pheromes) {
+			if (pherome.player == player_cell.player) continue;
+			double dist = player_cell.distance(pherome);
+			if (dist <= 0.0001) return 0;
+			if (dist >= 0 && dist < closest) {
+				closest = dist;
+			}
+		}
+		
+		return closest;
+	}
+	
+	// check if moving player_cell by vector collides with any nearby cell or hostile pherome
+	public static boolean collides(Cell player_cell, Point vector, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
+		Iterator<Cell> cell_it = nearby_cells.iterator();
+		Point destination = player_cell.getPosition().move(vector);
+		while (cell_it.hasNext()) {
+			Cell other = cell_it.next();
+			if ( destination.distance(other.getPosition()) < 0.5*player_cell.getDiameter() + 0.5*other.getDiameter() + 0.00011) 
+				return true;
+		}
+		Iterator<Pherome> pherome_it = nearby_pheromes.iterator();
+		while (pherome_it.hasNext()) {
+			Pherome other = pherome_it.next();
+			if (other.player != player_cell.player && destination.distance(other.getPosition()) < 0.5*player_cell.getDiameter() + 0.0001) 
+				return true;
+		}
+		return false;
 	}
 }

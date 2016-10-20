@@ -50,9 +50,16 @@ public class ExplorerMemory implements Memory {
 	public void initialize(byte memory) {
 		this.memStr = byteToString(memory);
 		this.defOrExp = getMemoryBlock(0, 1);
+		this.offsetCountDown=getMemoryBlock(1, 3);
+		//modified, make sure the memory is never straight zeros
+		int mdc=getMemoryBlock(3, 7);
+		if(mdc==0)
+			this.moveDirectionCountdown=1;
+		else
+			this.moveDirectionCountdown=mdc;
+		
+//		this.moveDirectionCountdown = getMemoryBlock(3, 7);
 		this.opposite = getMemoryBlock(7, 8);
-		this.moveDirectionCountdown = getMemoryBlock(3, 7);
-		this.offsetCountDown = getMemoryBlock(1, 3);	
 	}
 	
 	public void initialize(int offset, int dirCnt, int opposite) {

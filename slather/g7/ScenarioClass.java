@@ -158,14 +158,14 @@ public class ScenarioClass{
 
 		for (Cell p : friends){
 			for (Cell c: friends){
-				if (ToolBox.getCosine(p.getPosition(), c.getPosition()) > max_angle_friends){
+				if (ToolBox.getCosine(p.getPosition(), c.getPosition()) > max_angle_friends && (ToolBox.getCosine(p.getPosition(), c.getPosition()) < Math.PI )){
 					max_angle_friends = ToolBox.getCosine(p.getPosition(), c.getPosition());
 				}
 			}
 		}
 		for (Cell p : enemies){
 			for (Cell c: enemies){
-				if (ToolBox.getCosine(p.getPosition(), c.getPosition()) > max_angle_enemies){
+				if (ToolBox.getCosine(p.getPosition(), c.getPosition()) > max_angle_enemies && (ToolBox.getCosine(p.getPosition(), c.getPosition()) < Math.PI)){
 					max_angle_enemies = ToolBox.getCosine(p.getPosition(), c.getPosition());
 				}
 			}

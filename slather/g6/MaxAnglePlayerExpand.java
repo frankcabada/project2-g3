@@ -7,7 +7,7 @@ import slather.sim.Pherome;
 import slather.sim.GridObject;
 import java.util.*;
 
-public class MaxAnglePlayer implements slather.sim.Player {
+public class MaxAnglePlayerExpand implements slather.sim.Player {
 
 	private Random gen;
 	private int t;
@@ -27,26 +27,29 @@ public class MaxAnglePlayer implements slather.sim.Player {
 		if (player_cell.getDiameter() >= 2) {
 			return new Move(true, (byte) 0, (byte) 0);
 		}
-		Point largestAnglePath;
-		if(this.d>2){
-			Set<Cell> newCells = findCellWithinVision(nearby_cells, player_cell);
-			Set<Pherome> newPheromes = findPheromeWithinVision(nearby_pheromes, player_cell);
-			largestAnglePath = findBestPath(player_cell, newCells, newPheromes);
-		}else{
-			largestAnglePath = findBestPath(player_cell, nearby_cells, nearby_pheromes);
-		}
-		//if (Double.isNaN(largestAnglePath.x)) {throw new RuntimeException("Invalid vector");}
-		if (largestAnglePath.x == 0 && largestAnglePath.y == 0) {
-			//follow previous path
+		Set<GridObject> neighbors = findNeighbors(player_cell, nearby_cells, nearby_pheromes);
+		if (neighbors.size()==0) {
+			// follow previous path
 			Point vector = extractVectorFromAngle((int) memory);
+			if (Double.isNaN(vector.x) || Double.isNaN(vector.y)) {
+				System.out.println("Previous is NAN");
+			}
 			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes))
 				return new Move(vector, memory);
-
-		} else {
+		}
+		else if(neighbors.size()==1){
+			Point vector = avoidCell(player_cell, neighbors.iterator().next());
+			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes))
+				return new Move(vector, (byte)extractAngleFromVector(vector, player_cell));
+		}
+		else {
+			Point largestAnglePath = findBestPath(player_cell, neighbors);
 			if (!collides(player_cell, largestAnglePath, nearby_cells, nearby_pheromes)) {
-				
-				int angle = extractAngleFromVector(largestAnglePath, player_cell)/2;
-				return new Move(largestAnglePath,(byte) angle);
+				int angle = extractAngleFromVector(largestAnglePath, player_cell) / 2;
+				if (Double.isNaN(largestAnglePath.x) || Double.isNaN(largestAnglePath.y)) {
+					System.out.println("Current is NAN");
+				}
+				return new Move(largestAnglePath, (byte) angle);
 			}
 		}
 		// Generate a random new direction to travel
@@ -60,40 +63,68 @@ public class MaxAnglePlayer implements slather.sim.Player {
 		// if all tries fail, just chill in place
 		return new Move(new Point(0, 0), (byte) 0);
 	}
+	private Point avoidCell(Cell pl_cell, GridObject gridObject) {
+		int enemy_dir = extractAngleFromVector(gridObject.getPosition(), pl_cell);
+		enemy_dir *= 2; // back to 360 degrees for easier mental arithmetic
+		int my_cell_dir = (enemy_dir + 180) % 360; // opposite direction of
+													// enemy
+		my_cell_dir /= 2;
+		return this.extractVectorFromAngle(my_cell_dir);
+	}
 
-	private Set<Cell> findCellWithinVision(Set<Cell> nearby_cells, Cell player_cell){
+	private Set<GridObject> findNeighbors(Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
+		Set<GridObject> neighbors = new HashSet<GridObject>();
+		Set<GridObject> neighbors_samespecies = new HashSet<GridObject>();
+		Set<GridObject> neighbors_enemies = new HashSet<GridObject>();
+
+		for (Cell cell : nearby_cells) {
+			if (player_cell.distance(cell) <= cell_vision) {
+				if (cell.player == player_cell.player) {
+					neighbors_samespecies.add(cell);
+				} else {
+					neighbors_enemies.add(cell);
+				}
+				neighbors.add(cell);
+			}
+		}
+		for (Pherome pherome : nearby_pheromes) {
+			if (player_cell.distance(pherome) <= cell_vision && pherome.player != player_cell.player) {
+				neighbors.add(pherome);
+			}
+		}
+		if (neighbors_samespecies.size() * 1.5> neighbors_enemies.size()) {
+			return neighbors_samespecies;
+		}
+		return neighbors;
+	}
+
+	private Set<Cell> findCellWithinVision(Set<Cell> nearby_cells, Cell player_cell) {
 		Set<Cell> cells = new HashSet<>();
-		for(Cell cell: nearby_cells){
-			if(player_cell.distance(cell)<=cell_vision){
+		for (Cell cell : nearby_cells) {
+			if (player_cell.distance(cell) <= cell_vision) {
 				cells.add(cell);
 			}
 		}
 		return cells;
 	}
-	
-	private Set<Pherome> findPheromeWithinVision(Set<Pherome> nearby_pheromes, Cell player_cell){
+
+	private Set<Pherome> findPheromeWithinVision(Set<Pherome> nearby_pheromes, Cell player_cell) {
 		Set<Pherome> pheormes = new HashSet<>();
-		for(Pherome p: nearby_pheromes){
-			if(player_cell.distance(p)<=cell_vision){
+		for (Pherome p : nearby_pheromes) {
+			if (player_cell.distance(p) <= cell_vision) {
 				pheormes.add(p);
 			}
 		}
 		return pheormes;
 	}
-	
-	private Point findBestPath(Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
+
+	private Point findBestPath(Cell player_cell, Set<GridObject> nearbyObj) {
 		List<Point> neighbors = new ArrayList<Point>();
 		double largest = 0;
 		int index = -1;
-		for (GridObject cell : nearby_cells) {
+		for (GridObject cell : nearbyObj) {
 			Point position = getNearbyPosition(player_cell.getPosition(), cell.getPosition());
 			neighbors.add(position);
-		}
-		for (GridObject pherome : nearby_pheromes) {
-			if (pherome.player != player_cell.player) {
-				Point position = getNearbyPosition(player_cell.getPosition(), pherome.getPosition());
-				neighbors.add(position);
-			}
 		}
 		neighbors.sort(new PointsComparator());
 		if (neighbors.size() > 1) {
@@ -105,10 +136,15 @@ public class MaxAnglePlayer implements slather.sim.Player {
 					index = i;
 				}
 			}
-			
+
 			double angle1 = Math.atan2(neighbors.get(0).y, neighbors.get(0).x);
 			double angle2 = Math.atan2(neighbors.get(neighbors.size() - 1).y, neighbors.get(neighbors.size() - 1).x);
-			if (Double.isNaN(angle1) || Double.isNaN(angle2)) {throw new RuntimeException(neighbors.get(0).y + "," + neighbors.get(0).x + "; " + neighbors.get(neighbors.size()-1).y + "," + neighbors.get(neighbors.size()-1).x);}
+			/*
+			 * if (Double.isNaN(angle1) || Double.isNaN(angle2)) { throw new
+			 * RuntimeException(neighbors.get(0).y + "," + neighbors.get(0).x +
+			 * "; " + neighbors.get(neighbors.size() - 1).y + "," +
+			 * neighbors.get(neighbors.size() - 1).x); }
+			 */
 			if (largest < angle1 + 2 * Math.PI - angle2) {
 				largest = angle1 + 2 * Math.PI - angle2;
 				index = 0;
@@ -138,7 +174,7 @@ public class MaxAnglePlayer implements slather.sim.Player {
 				x = two.x + x_coordinate * 100;
 				y = two.y + y_coordinate * 100;
 				double d = getDistanceOfTwoPoints(one, new Point(x, y));
-				
+
 				if (dis > d) {
 					dis = d;
 					p = new Point(x - one.x, y - one.y);
@@ -148,7 +184,9 @@ public class MaxAnglePlayer implements slather.sim.Player {
 
 		double X = p.x, Y = p.y;
 		double L = Math.hypot(X, Y);
-		if (L == 0.0) {return new Point(0,0);}
+		if (L == 0.0) {
+			return new Point(0, 0);
+		}
 		X /= L;
 		Y /= L;
 		return new Point(X, Y);
@@ -180,6 +218,7 @@ public class MaxAnglePlayer implements slather.sim.Player {
 		}
 		return false;
 	}
+
 	private int extractAngleFromVector(Point arg, Cell player_cell) {
 		double x = player_cell.getPosition().x;
 		double y = player_cell.getPosition().y;

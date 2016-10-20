@@ -16,8 +16,8 @@ import slather.sim.Point;
  * This strategy follows the closest friend in vision.
  * */
 
-public class FollowerStrategy implements Strategy{
-	static double vision=5.0;
+public class FollowerStrategy implements Strategy {
+	static double vision = 5.0;
 
 	@Override
 	public Memory generateNextMoveMemory(Memory currentMemory) {
@@ -37,40 +37,40 @@ public class FollowerStrategy implements Strategy{
 	@Override
 	public Move generateMove(Cell player_cell, Memory memory, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
 		System.out.println("Follower strategy. Head to the closest friend I see.");
-		Point nextStep=generateNextDirection(player_cell,memory,nearby_cells,nearby_pheromes);
+		Point nextStep = generateNextDirection(player_cell, memory, nearby_cells, nearby_pheromes);
 		Memory nextMem = generateNextMoveMemory(memory);
 
-		return new Move(nextStep,nextMem.getByte());
+		return new Move(nextStep, nextMem.getByte());
 	}
 
 	@Override
 	public Point generateNextDirection(Cell player_cell, Memory memory, Set<Cell> nearby_cells,
 			Set<Pherome> nearby_pheromes) {
-		//Only chase the friends that can possibly be reached?
-		Set<Cell> near=ToolBox.limitVisionOnCells(player_cell, nearby_cells, vision);
-		
-		double shortestDist=100.0;
-		Cell toFollow=null;
-		for(Cell c:near){
-			if(c.player==player_cell.player){
-				double distBetween=c.getPosition().distance(player_cell.getPosition());
-				if(distBetween<shortestDist){
-					toFollow=c;
-					shortestDist=distBetween;
+		// Only chase the friends that can possibly be reached?
+		Set<Cell> near = ToolBox.limitVisionOnCells(player_cell, nearby_cells, vision);
+
+		double shortestDist = 100.0;
+		Cell toFollow = null;
+		for (Cell c : near) {
+			if (c.player == player_cell.player) {
+				double distBetween = c.getPosition().distance(player_cell.getPosition());
+				if (distBetween < shortestDist) {
+					toFollow = c;
+					shortestDist = distBetween;
 				}
 			}
 		}
 		Point toMove;
-		if(toFollow==null){
+		if (toFollow == null) {
 			System.out.println("Closest friend not found. Decide direction randomly.");
-			toMove=ToolBox.generateRandomDirection();
-		}else{
-			System.out.println("Going to closest friend "+toFollow.getPosition());
-			Set<Cell> togo=new HashSet<>();
+			toMove = ToolBox.generateRandomDirection();
+		} else {
+			System.out.println("Going to closest friend " + toFollow.getPosition());
+			Set<Cell> togo = new HashSet<>();
 			togo.add(toFollow);
-			toMove=ToolBox.joinForcesFromCells(player_cell, togo, 1.0, -1, false);
+			toMove = ToolBox.joinForcesFromCells(player_cell, togo, 1.0, -1, false);
 		}
-		
+
 		return ToolBox.normalizeDistance(toMove);
 	}
 
