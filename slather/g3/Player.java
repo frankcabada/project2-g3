@@ -23,8 +23,23 @@ public class Player implements slather.sim.Player {
 		this.side_length = side_length;
     }
 
+    private class Moves {
+		public boolean cluster;
+		public ArrayList<Integer> angles;
+
+		public Moves() {
+			cluster = false;
+			angles = null;
+		}
+
+		public Moves(boolean cluster, ArrayList<Integer> angleList) {
+			this.cluster = cluster;
+			this.angles = angleList;
+		}
+	}
+
 	public Move play(Cell player_cell, byte memory, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {			
-		
+
 		if (player_cell.getDiameter() >= 2){ // reproduce whenever possible			
 			// Use code below if want to have different first 6 bits and last 2 bits
 			//byte memory1 = (byte) ((f6bits << 2) | (0x03 & l2bits)); //First daughter keeps same strategy
@@ -45,7 +60,11 @@ public class Player implements slather.sim.Player {
 		ArrayList<Integer> angleList = new ArrayList<Integer>();
 		angleList.addAll(cellAngleList);
 		angleList.addAll(pheromeAngleList);*/
-		ArrayList<Integer> angleList = generateAngleList(player_cell, nearby_cells, nearby_pheromes);
+
+		Moves moves = generateAngleList(player_cell, nearby_cells, nearby_pheromes);
+		boolean cluster = moves.cluster;
+		ArrayList<Integer> angleList = moves.angles;
+		//ArrayList<Integer> angleList = generateAngleList(player_cell, nearby_cells, nearby_pheromes);
 		Collections.sort(angleList);
 //			System.out.println(angleList);
 		
@@ -84,16 +103,34 @@ public class Player implements slather.sim.Player {
 					maxDiff = thisDiff;
 				}
 			}
-			for(int j=0; j<possibleAngles.size(); j++){
-				int best_angle = possibleAngles.get(j);
-				//int best_angle = possibleAngles.get(0);
+			/*
+			// COMMENT OUT THIS IF BLOCK IF CLUSTER NOT ACHIEVING DESIRED RESULTS
+			// Only try best angle (away from friendly cells) when in a cluster
+			if (cluster) {
+				int best_angle = possibleAngles.get(0);
+				// Try shorter distances if move attempt collides
 				for (float k=1; k>0; k-=0.1){
 					Point vector = extractVectorFromAngleWithScalar(best_angle, k);
 					if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
 						memory = angleToByte(best_angle); //// keep within 8 bits
 						return new Move(vector, memory);
 					}
-				}	
+				}
+				// If this point is reached, no move distance worked so chill in place to protect cluster border
+				return new Move(new Point(0, 0), (byte) 0);
+			}
+			*/
+
+			// Not in a cluster so try all possible angles and distances until one works
+			for (float k=1; k>0; k-=0.1) {
+				for(int j=0; j<possibleAngles.size(); j++){
+					int best_angle = possibleAngles.get(j);
+					Point vector = extractVectorFromAngleWithScalar(best_angle, k);
+					if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+						memory = angleToByte(best_angle); //// keep within 8 bits
+						return new Move(vector, memory);
+					}
+				}
 			}
 		}	
 	
@@ -354,11 +391,16 @@ public class Player implements slather.sim.Player {
 		return angleList;
 	}
 
-	private ArrayList<Integer> generateAngleList(Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
+	private Moves generateAngleList(Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
 		ArrayList<GridObject> nearby_objects = getNearbyFriendsOrAll(player_cell, nearby_cells, nearby_pheromes);
 		ArrayList<Integer> angleList = new ArrayList<Integer>();
-		
+		boolean cluster_border = false;
+		int friends = 0;
+		int enemies = 0;
+
 		for(GridObject object : nearby_objects) {
+			if (object.player == player_cell.player) { friends++; }
+			else { enemies++; }
 			double pX = object.getPosition().x;
 			double pY = object.getPosition().y;
 			double tX = player_cell.getPosition().x;
@@ -370,7 +412,11 @@ public class Player implements slather.sim.Player {
 			angleList.add(angle);
 		}
 		Collections.sort(angleList);
-		return angleList;
+		if (friends > enemies && enemies > 2) {
+			cluster_border = true;
+		}
+		Moves moves = new Moves(cluster_border, angleList);
+		return moves;
 	}
 
 	private ArrayList<GridObject> getNearbyFriendsOrAll(Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes) {
@@ -400,7 +446,7 @@ public class Player implements slather.sim.Player {
 			}
 			allObjects.add(pherome);
 		}
-		if (friends.size() * 1.75 > enemies.size()) {
+		if (friends.size() > enemies.size()) {
 			return friends;
 		}
 		return allObjects;

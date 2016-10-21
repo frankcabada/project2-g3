@@ -21,7 +21,7 @@ function process(data)
 {
     // check the canvas size
     var canvas = document.getElementById("canvas");
-    var colors = ["red", "green", "blue", "purple", "orange", "cyan", "yellow", "hotpink", "palegreen", "maroon"];
+    var colors = ["red", "blue", "purple", "orange", "cyan", "yellow", "hotpink", "palegreen", "maroon", "green"];
     var y_base = 90;
     var size = canvas.height - y_base;
     var xoffset = 30;    
@@ -56,6 +56,8 @@ function process(data)
     ctx.lineWidth = 4;
     ctx.strokeStyle = "darkgrey";
     // parse game status
+    if (params[3] >= 99)
+	pause();
     ctx.strokeText("Total turns played: " + params[2], 0, y_base - 60);;
     ctx.fillStyle = "black";
     ctx.fillText("Total turns played: " + params[2], 0, y_base - 60);;

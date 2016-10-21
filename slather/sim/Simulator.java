@@ -14,7 +14,7 @@ class Simulator {
 
     // timeouts
     private static long init_timeout = 1000;
-    private static long play_timeout = 1000;
+    private static long play_timeout = 40;
 
     // exit on player exception
     private static boolean exit_on_exception = false;
@@ -60,11 +60,18 @@ class Simulator {
     private static boolean log = false;
     
     
-    private static boolean init() {
+    private static boolean init() {	
 	grid = new Grid((double)side_length, d);
 	for (int g=0; g<p; g++) {
 	    for (int j=0; j<n; j++) {
-		grid.add(new Cell( new Point(random.nextInt(side_length),random.nextInt(side_length)), g) );
+		boolean added = false;
+		Cell new_cell = null;
+		while (!added) {
+		    new_cell = new Cell( new Point(random.nextInt(side_length),random.nextInt(side_length)), g);
+		    if (grid.fits(new_cell))
+			added = true;
+		}
+		grid.add(new_cell);
 	    }
 	}
 
@@ -208,7 +215,8 @@ class Simulator {
 	long turn = 0;
 	for (;;) {
 	    // run next turn
-	    println("### beg of turn " + turn + " ###");
+	    if (log)
+		println("### beg of turn " + turn + " ###");
 	    next();
 	    if (turns_without_reproduction >= 100)
 		break;
@@ -319,13 +327,15 @@ class Simulator {
 	    System.out.close();
 	}
 	// print parameters
-	System.err.println("Players: " + p);
-	System.err.println("Groups: " + Arrays.toString(groups));
-	System.err.println("Cells: " + n);
-	System.err.println("Pherome duration: " + t);
-	System.err.println("Verbose: " + (verbose   ? "yes" : "no"));
-	System.err.println("Recompile: " + (recompile ? "yes" : "no"));
-	if (!gui)
+	if (log) {
+	    System.err.println("Players: " + p);
+	    System.err.println("Groups: " + Arrays.toString(groups));
+	    System.err.println("Cells: " + n);
+	    System.err.println("Pherome duration: " + t);
+	    System.err.println("Verbose: " + (verbose   ? "yes" : "no"));
+	    System.err.println("Recompile: " + (recompile ? "yes" : "no"));
+	}
+	if (!gui && log) 
 	    System.err.println("GUI: disabled");
 	else if (refresh < 0)
 	    System.err.println("GUI: enabled  (0 FPS)  [reload manually]");
@@ -333,7 +343,8 @@ class Simulator {
 	    System.err.println("GUI: enabled  (max FPS)");
 	else {
 	    double fps = 1000.0 / refresh;
-	    System.err.println("GUI: enabled  (up to " + fps + " FPS)");
+	    if (log)
+		System.err.println("GUI: enabled  (up to " + fps + " FPS)");
 	}
 	// initialize and play
 	if (!init()) {
@@ -473,13 +484,10 @@ class Simulator {
 		    throw new FileNotFoundException(
 						    "Missing source of group " + group);
 		Set <File> files = directory(dir, ".java");
-		System.err.print("Compiling " + group +
-				 " (" + files.size() + " files) ... ");
 		if (!compiler.getTask(null, manager, null, null, null,
 				      manager.getJavaFileObjectsFromFiles(files)).call())
 		    throw new IOException(
 					  "Cannot compile source of " + group);
-		System.err.println("done!");
 		class_file = new File(dir + sep + "Player.class");
 		if (!class_file.exists())
 		    throw new FileNotFoundException(

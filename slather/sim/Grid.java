@@ -62,6 +62,17 @@ public class Grid {
 	return cells;
     }
 
+    public boolean fits(Cell q) { // only use this to initialize cell locations. All cell diameters are 1
+	GridObjectsContainer nearby = get_nearby(q);
+	Iterator<Cell> it = nearby.nearby_cells.iterator();
+	while (it.hasNext()) {
+	    if (q.distance(it.next()) < 0.0001) {
+		return false;
+	    }
+	}
+	return true;
+    }
+
     public void age_pheromes() {
 	/*Iterator<Pherome> it = pheromes.iterator();
 	while (it.hasNext()) {

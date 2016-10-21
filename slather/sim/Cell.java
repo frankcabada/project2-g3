@@ -33,9 +33,9 @@ public class Cell extends GridObject{
     // called by simulator    
     
     protected void move(Point vector, Set<Pherome> pheromes, Set<Cell> cells, boolean log) {
-	if (vector.norm() > move_dist + 0.00001) {
+	if (vector.norm() > move_dist + 0.00001 || Double.isInfinite(vector.x) || Double.isInfinite(vector.y) || Double.isNaN(vector.x) || Double.isNaN(vector.y)) {
 	    if (log)
-		System.err.println("Cell cannot move more than " + move_dist + " per turn.");
+		System.err.println("Invalid movement vector.");
 	    return;
 	}	   
 	Point new_position = position.move(vector);
@@ -73,7 +73,7 @@ public class Cell extends GridObject{
 	Iterator<Cell> cell_it = cells.iterator();
 	while (cell_it.hasNext()) {
 	    Cell next = cell_it.next();
-	    new_diameter = Math.min(new_diameter, 2*(distance(next) - 0.5*next.getDiameter()));
+	    new_diameter = Math.min(new_diameter, 2*(distance(next) + 0.5*getDiameter()));
 	}
 	if (new_diameter > 2)
 	    new_diameter = 2.0000001;
