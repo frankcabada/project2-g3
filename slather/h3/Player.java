@@ -6,7 +6,6 @@ import slather.sim.Point;
 import slather.sim.Move;
 import slather.sim.Pherome;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class Player implements slather.sim.Player {
 
@@ -14,8 +13,9 @@ public class Player implements slather.sim.Player {
     private double d;
     private int t;
     private int side_length;
-    private final int CLOSE_RANGE = 10;
+    private final int CLOSE_RANGE = 3;
     private final int ANGLE_PRECISION = 2;
+    private final float rangeValues[] = {3.0f,2.0f,1,.8f,.6f,.4f,.2f,.1f};
 
     public void init(double d, int t, int side_length) {
 		gen = new Random();
@@ -29,51 +29,83 @@ public class Player implements slather.sim.Player {
 		if (player_cell.getDiameter() >= 2){ // reproduce whenever possible			
 			byte memory1 = memory;
 			int angle2 = memoryToAngleInt(memory);
-			angle2 = (angle2 + gen.nextInt(180))%360; //Angle should be opposite
+			angle2 = (angle2 + 180)%360; //Angle should be opposite
 			byte memory2 =  angleToByte(angle2);
 			return new Move(true, memory1, memory2);
 		}
+
+		int strategy = clusterDetection(player_cell, nearby_cells, nearby_pheromes);
+//		int rangeStart = 6;
+		int rangeStart=0;
 		
-		ArrayList<Integer> validMoves = generateValidMoves(player_cell, nearby_cells, nearby_pheromes);
-		ArrayList<Integer> badAngles = new ArrayList<Integer>();
-		badAngles.addAll(generateMapOfNearbyCells(player_cell, nearby_cells,false,false,CLOSE_RANGE).keySet());
-		badAngles.addAll(generateMapOfNearbyPheromes(player_cell, nearby_pheromes,false,true,CLOSE_RANGE).keySet());
+		switch(strategy){
+		case 0: rangeStart=0; break;
+		case 1: rangeStart=5; break;
+		case 2: rangeStart=5; break;
+		}
 		
-		if(!badAngles.isEmpty()){
-			TreeMap<Integer, Set<Integer>> scoredMoves = scoredMovesMap(player_cell, validMoves, badAngles);
+		for(int i=rangeStart; i<rangeValues.length; i++){
 			
-			ArrayList<Integer> keyList = new ArrayList<Integer>(scoredMoves.keySet());
-			Collections.sort(keyList);
+			ArrayList<Integer> validMoves = generateValidMoves(player_cell, nearby_cells, nearby_pheromes);
+			ArrayList<Integer> badAngles = new ArrayList<Integer>();
 			
-			if(!keyList.isEmpty()){
-				for(int k=0; k<3; k++){
-					for(int angle : scoredMoves.get(k)){
-						Point vector = extractVectorFromAngle(angle);
-						if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
-							memory = angleToByte(angle);
-							return new Move(vector, memory);
+			switch(strategy){
+			case 0: badAngles.addAll(generateMapOfNearbyCells(player_cell, nearby_cells,false,true,rangeValues[i]).keySet());
+					badAngles.addAll(generateMapOfNearbyPheromes(player_cell, nearby_pheromes,false,true,rangeValues[i]).keySet());
+					break;
+			case 1: badAngles.addAll(generateMapOfNearbyCells(player_cell, nearby_cells,true,false,rangeValues[i]).keySet());
+					badAngles.addAll(generateMapOfNearbyPheromes(player_cell, nearby_pheromes,true,true,rangeValues[i]).keySet());
+					break;
+			case 2: badAngles.addAll(generateMapOfNearbyCells(player_cell, nearby_cells,true,false,rangeValues[i]).keySet());
+					badAngles.addAll(generateMapOfNearbyPheromes(player_cell, nearby_pheromes,true,false,rangeValues[i]).keySet());
+			break;
+			
+			}
+			
+			float dist = Math.min(1, rangeValues[i]);
+			
+			if(badAngles.isEmpty()){
+				int angle = memoryToAngleInt(memory);
+				Point vector = extractVectorFromAngleWithScalar(angle,dist);
+//				Point vector = extractVectorFromAngle(angle);
+				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+					memory = angleToByte(angle);
+					return new Move(vector, memory);
+				}
+			}
+			else if(badAngles.size()==1){
+				int angle = (badAngles.get(0) + 180)%360;
+				Point vector = extractVectorFromAngleWithScalar(angle,dist);
+//				Point vector = extractVectorFromAngle(angle);
+				if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+					memory = angleToByte(angle);
+					return new Move(vector, memory);
+				}
+			}
+			else{
+				TreeMap<Integer, ArrayList<Integer>> scoredMoves = scoredMovesMap(player_cell, validMoves, badAngles);
+				
+				ArrayList<Integer> keyList = new ArrayList<Integer>(scoredMoves.keySet());
+				Collections.sort(keyList);
+				
+				if(!keyList.isEmpty()){
+					for(int k=0; k<Math.min(3,keyList.size()); k++){
+						Collections.shuffle(scoredMoves.get(keyList.get(k)));
+						for(int angle : scoredMoves.get(keyList.get(k))){
+							Point vector = extractVectorFromAngleWithScalar(angle,dist);
+							if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+								memory = angleToByte(angle);
+								return new Move(vector, memory);
+							}
 						}
 					}
 				}
 			}
 		}
-		else if(badAngles.size()==1){
-			int angle = (badAngles.get(0) + 180)%360;
-			Point vector = extractVectorFromAngle(angle);
-			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
-				memory = angleToByte(angle);
-				return new Move(vector, memory);
-			}
-		}
-		else{
-			int angle = memoryToAngleInt(memory);
-			Point vector = extractVectorFromAngle(angle);
-			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
-				memory = angleToByte(angle);
-				return new Move(vector, memory);
-			}
-		}
 		
+		
+
+		//System.out.println("Strategy failed.");
 	
 		// If there was a collision, try a few random directions to go in until one doesn't collide
 		for (int i = 0; i < 10; i++) {
@@ -343,8 +375,8 @@ public class Player implements slather.sim.Player {
 		return angles;
 	}
 	
-	private TreeMap<Integer,Set<Integer>> scoredMovesMap(Cell player_cell,ArrayList<Integer> validMoves, ArrayList<Integer> badAngles){
-		TreeMap<Integer,Set<Integer>> scoredMoves = new TreeMap<Integer,Set<Integer>>();
+	private TreeMap<Integer,ArrayList<Integer>> scoredMovesMap(Cell player_cell,ArrayList<Integer> validMoves, ArrayList<Integer> badAngles){
+		TreeMap<Integer,ArrayList<Integer>> scoredMoves = new TreeMap<Integer,ArrayList<Integer>>();
 		
 		for(int moveAngle : validMoves){
 			int score = scoreAngle(moveAngle, player_cell, badAngles);
@@ -352,12 +384,48 @@ public class Player implements slather.sim.Player {
 				scoredMoves.get(score).add(moveAngle);
 			}
 			else{
-				HashSet<Integer> newSet = new HashSet<Integer>();
-				newSet.add(moveAngle);
-				scoredMoves.put(score,newSet);
+				ArrayList<Integer> newList = new ArrayList<Integer>();
+				newList.add(moveAngle);
+				scoredMoves.put(score,newList);
 			}
 		}
 		return scoredMoves;
+	}
+	
+	private int clusterDetection(Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes){
+		int friendlyCount=0;
+		int enemyCount=0;
+		
+		
+		if(nearby_cells.size()<5)
+			return 0;
+		
+		for(Cell p : nearby_cells){
+			if(player_cell.distance(p)>CLOSE_RANGE){
+				continue;
+			}
+			
+			if(p.player == player_cell.player)
+				friendlyCount++;
+			else
+				enemyCount++;
+		}
+		
+		double ratio = ((double)friendlyCount)/(friendlyCount+enemyCount);
+		
+//		if (friendlyCount > enemyCount && enemyCount > 2) {
+//			return 2;
+//		}
+		
+		if((friendlyCount+enemyCount) < 5)
+			return 0;
+		if(ratio > .9)
+			return 1;
+		else if (ratio < .5)
+			return 2;
+		else
+			return 0;
+		
 	}
 	
 	private int scoreAngle(int inputAngle, Cell player_cell, ArrayList<Integer> badAngles){
