@@ -6,6 +6,7 @@ import slather.sim.Point;
 import slather.sim.Move;
 import slather.sim.Pherome;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class Player implements slather.sim.Player {
 
@@ -13,7 +14,7 @@ public class Player implements slather.sim.Player {
     private double d;
     private int t;
     private int side_length;
-    private final int CLOSE_RANGE = 2;
+    private final int CLOSE_RANGE = 10;
     private final int ANGLE_PRECISION = 2;
 
     public void init(double d, int t, int side_length) {
@@ -28,26 +29,51 @@ public class Player implements slather.sim.Player {
 		if (player_cell.getDiameter() >= 2){ // reproduce whenever possible			
 			byte memory1 = memory;
 			int angle2 = memoryToAngleInt(memory);
-			angle2 = (angle2 + 180)%360; //Angle should be opposite
+			angle2 = (angle2 + gen.nextInt(180))%360; //Angle should be opposite
 			byte memory2 =  angleToByte(angle2);
 			return new Move(true, memory1, memory2);
 		}
 		
+		ArrayList<Integer> validMoves = generateValidMoves(player_cell, nearby_cells, nearby_pheromes);
+		ArrayList<Integer> badAngles = new ArrayList<Integer>();
+		badAngles.addAll(generateMapOfNearbyCells(player_cell, nearby_cells,false,false,CLOSE_RANGE).keySet());
+		badAngles.addAll(generateMapOfNearbyPheromes(player_cell, nearby_pheromes,false,true,CLOSE_RANGE).keySet());
 		
-		// Try safe moves nonstop
-		for (int i = 0; i < 360/ANGLE_PRECISION; i+= ANGLE_PRECISION) {
-			int angle = i;
-			Point rand_vector = extractVectorFromAngle(angle);
-			if (!collides(player_cell, rand_vector, nearby_cells, nearby_pheromes)){
-				Cell newCell = new Cell(player_cell.getPosition(), player_cell.player, player_cell.getDiameter());
-				if( MaxGrowableAmount(newCell, nearby_pheromes, nearby_cells) < 1.01 - .0001){
-					memory = angleToByte(angle);
-					return new Move(rand_vector, memory);
+		if(!badAngles.isEmpty()){
+			TreeMap<Integer, Set<Integer>> scoredMoves = scoredMovesMap(player_cell, validMoves, badAngles);
+			
+			ArrayList<Integer> keyList = new ArrayList<Integer>(scoredMoves.keySet());
+			Collections.sort(keyList);
+			
+			if(!keyList.isEmpty()){
+				for(int k=0; k<3; k++){
+					for(int angle : scoredMoves.get(k)){
+						Point vector = extractVectorFromAngle(angle);
+						if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+							memory = angleToByte(angle);
+							return new Move(vector, memory);
+						}
+					}
 				}
 			}
 		}
+		else if(badAngles.size()==1){
+			int angle = (badAngles.get(0) + 180)%360;
+			Point vector = extractVectorFromAngle(angle);
+			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+				memory = angleToByte(angle);
+				return new Move(vector, memory);
+			}
+		}
+		else{
+			int angle = memoryToAngleInt(memory);
+			Point vector = extractVectorFromAngle(angle);
+			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes)){
+				memory = angleToByte(angle);
+				return new Move(vector, memory);
+			}
+		}
 		
-		System.out.println("Couldn't find a safe move.");
 	
 		// If there was a collision, try a few random directions to go in until one doesn't collide
 		for (int i = 0; i < 10; i++) {
@@ -267,6 +293,28 @@ public class Player implements slather.sim.Player {
 		return diameter/c.getDiameter();
     }
 	
+	private double distanceToClosestInterference(Cell player_cell, Set<Cell> neighbors, Set<Pherome> pheromes){
+		double maxDistance = Double.MAX_VALUE;
+//		Cell neighbor = null;
+		for(Cell c : neighbors){
+			double distance = player_cell.distance(c);
+			if(distance < maxDistance){
+//				neighbor = c;
+				maxDistance = distance;
+			}
+		}
+		
+//		Pherome pherome = null;
+		for(Pherome p : pheromes){
+			double distance = player_cell.distance(p);
+			if(p.player != player_cell.player && distance < maxDistance){
+//				pherome = p;
+				maxDistance = distance;
+			}
+		}
+		return maxDistance;
+	}
+	
 	private double distanceToClosestNeighbor(Cell player_cell, Set<Cell> neighbors){
 		return player_cell.distance(getClosestCell(player_cell, neighbors));
 	}
@@ -282,6 +330,51 @@ public class Player implements slather.sim.Player {
 			}
 		}
 		return neighbor;
+	}
+	
+	private ArrayList<Integer> generateValidMoves(Cell player_cell, Set<Cell> nearby_cells, Set<Pherome> nearby_pheromes){
+		ArrayList<Integer> angles = new ArrayList<Integer>();
+		Point vector;
+		for(int i=0; i<360; i+=ANGLE_PRECISION){
+			vector = extractVectorFromAngle(i);
+			if (!collides(player_cell, vector, nearby_cells, nearby_pheromes))
+				angles.add(i);
+		}
+		return angles;
+	}
+	
+	private TreeMap<Integer,Set<Integer>> scoredMovesMap(Cell player_cell,ArrayList<Integer> validMoves, ArrayList<Integer> badAngles){
+		TreeMap<Integer,Set<Integer>> scoredMoves = new TreeMap<Integer,Set<Integer>>();
+		
+		for(int moveAngle : validMoves){
+			int score = scoreAngle(moveAngle, player_cell, badAngles);
+			if(scoredMoves.containsKey(score)){
+				scoredMoves.get(score).add(moveAngle);
+			}
+			else{
+				HashSet<Integer> newSet = new HashSet<Integer>();
+				newSet.add(moveAngle);
+				scoredMoves.put(score,newSet);
+			}
+		}
+		return scoredMoves;
+	}
+	
+	private int scoreAngle(int inputAngle, Cell player_cell, ArrayList<Integer> badAngles){
+		if(badAngles.isEmpty())
+			return 0;
+		Collections.sort(badAngles);
+		if(badAngles.contains(inputAngle))
+			return 0;
+		else{
+			int score = 0;
+			for(int i=0; i<badAngles.size(); i++){
+				if(badAngles.get(i) < inputAngle && inputAngle < badAngles.get((i+1)%badAngles.size())){
+					score =  Math.min( badAngles.get((i+1)%badAngles.size()), badAngles.get(i) );
+				}
+			}
+			return score;
+		}
 	}
 	
 	//Threshold is negative if we want to ignore it
@@ -306,7 +399,7 @@ public class Player implements slather.sim.Player {
 			double dY = cY-tY;
 			int angle = (int)Math.toDegrees(Math.atan2(dY,dX));
 			angle = (angle+360)%360;
-			angleToCellMap.put((int)Math.toDegrees(angle), c);
+			angleToCellMap.put(angle, c);
 		}
 		return angleToCellMap;
 	}
@@ -334,7 +427,7 @@ public class Player implements slather.sim.Player {
 			angle = (angle+360)%360;
 
 			
-			angleToPheromeMap.put((int)Math.toDegrees(angle), p);
+			angleToPheromeMap.put(angle, p);
 			
 			
 		}
